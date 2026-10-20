@@ -1,0 +1,16 @@
+**/node_modules
+**/.next
+**/out
+**/dist
+**/.turbo
+**/*.tsbuildinfo
+**/.env
+**/.env*.local
+.git
+.github
+.claude
+infra
+**/.terraform
+**/*.log
+**/.DS_Store
+docker-compose.yml

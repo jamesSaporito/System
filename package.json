@@ -1,0 +1,26 @@
+{
+  "name": "portfolio",
+  "private": true,
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": ">=24.22.0"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "preview": "turbo run build --filter=@portfolio/web && pnpm --filter=@portfolio/web preview",
+    "dev:docker": "docker compose up --build web",
+    "preview:docker": "docker compose --profile preview up --build preview"
+  },
+  "devDependencies": {
+    "@portfolio/config": "workspace:*",
+    "oxlint": "1.88.0",
+    "oxlint-tsgolint": "7.0.2004",
+    "prettier": "3.9.10",
+    "turbo": "2.11.9"
+  }
+}
