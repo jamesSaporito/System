@@ -1,10 +1,25 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "globalDependencies": [".nvmrc"],
+  // Strict env mode would otherwise drop values docker-compose.yml sets for containers.
+  "globalPassThroughEnv": ["DATABASE_URL", "DEV_CONTAINER"],
   "tasks": {
     "db:generate": {
       "inputs": ["prisma/**", "prisma.config.ts"],
       "outputs": ["src/generated/**"]
+    },
+    // Starts Postgres via docker compose (a no-op inside the dev container).
+    "db:up": {
+      "cache": false
+    },
+    "db:deploy": {
+      "dependsOn": ["db:up"],
+      "cache": false
+    },
+    "db:studio": {
+      "dependsOn": ["db:up"],
+      "cache": false,
+      "persistent": true
     },
     "build": {
       "dependsOn": ["^build", "^db:generate"],
@@ -17,10 +32,20 @@
     "typecheck": {
       "dependsOn": ["^typecheck", "db:generate", "^db:generate"]
     },
+    "test": {
+      "dependsOn": ["db:generate", "^db:generate", "^db:deploy"],
+      // Tests hit the local database, so results aren't reproducible from inputs alone.
+      "cache": false
+    },
     "dev": {
-      "dependsOn": ["^db:generate"],
-      // Strict env mode would otherwise drop values set by docker-compose.yml.
-      "passThroughEnv": ["PORT", "DATABASE_URL"],
+      // Packages that depend on @portfolio/db get a running, migrated database first.
+      "dependsOn": ["^db:generate", "^db:deploy"],
+      "passThroughEnv": ["PORT"],
+      "cache": false,
+      "persistent": true
+    },
+    "preview": {
+      "dependsOn": ["build"],
       "cache": false,
       "persistent": true
     }

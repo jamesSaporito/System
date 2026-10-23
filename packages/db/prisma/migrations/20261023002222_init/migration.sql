@@ -1,102 +1,103 @@
 -- CreateEnum
-CREATE TYPE "PageStatus" AS ENUM ('DRAFT', 'PUBLISHED');
+CREATE TYPE "page_status" AS ENUM ('draft', 'published');
 
 -- CreateEnum
-CREATE TYPE "ListLayout" AS ENUM ('GRID', 'LIST');
+CREATE TYPE "list_layout" AS ENUM ('grid', 'list');
 
 -- CreateEnum
-CREATE TYPE "DeployStatus" AS ENUM ('QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED');
+CREATE TYPE "deploy_status" AS ENUM ('queued', 'running', 'succeeded', 'failed');
 
 -- CreateTable
-CREATE TABLE "Collection" (
+CREATE TABLE "collections" (
     "id" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT,
-    "listLayout" "ListLayout" NOT NULL DEFAULT 'GRID',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "list_layout" "list_layout" NOT NULL DEFAULT 'grid',
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "Collection_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "collections_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "Page" (
+CREATE TABLE "pages" (
     "id" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "summary" TEXT,
     "body" JSONB NOT NULL,
-    "status" "PageStatus" NOT NULL DEFAULT 'DRAFT',
-    "publishedAt" TIMESTAMP(3),
-    "sortDate" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "status" "page_status" NOT NULL DEFAULT 'draft',
+    "published_at" TIMESTAMP(3),
+    "sort_date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "tags" TEXT[],
-    "seoTitle" TEXT,
-    "seoDescription" TEXT,
-    "collectionId" TEXT,
-    "coverMediaId" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "seo_title" TEXT,
+    "seo_description" TEXT,
+    "collection_id" TEXT,
+    "cover_media_id" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "Page_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "pages_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "Media" (
+CREATE TABLE "media" (
     "id" TEXT NOT NULL,
-    "s3Key" TEXT NOT NULL,
-    "mimeType" TEXT NOT NULL,
+    "s3_key" TEXT NOT NULL,
+    "mime_type" TEXT NOT NULL,
     "size" INTEGER NOT NULL,
     "width" INTEGER,
     "height" INTEGER,
     "alt" TEXT NOT NULL DEFAULT '',
     "caption" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "Media_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "media_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "NavItem" (
+CREATE TABLE "nav_items" (
     "id" TEXT NOT NULL,
     "label" TEXT NOT NULL,
-    "order" INTEGER NOT NULL,
-    "pageId" TEXT,
+    "position" INTEGER NOT NULL,
+    "page_id" TEXT,
     "href" TEXT,
 
-    CONSTRAINT "NavItem_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "nav_items_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "Deploy" (
+CREATE TABLE "deploys" (
     "id" TEXT NOT NULL,
-    "status" "DeployStatus" NOT NULL DEFAULT 'QUEUED',
-    "triggeredBy" TEXT,
-    "githubRunId" TEXT,
+    "status" "deploy_status" NOT NULL DEFAULT 'queued',
+    "triggered_by" TEXT,
+    "github_run_id" TEXT,
     "error" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "finishedAt" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "finished_at" TIMESTAMP(3),
 
-    CONSTRAINT "Deploy_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "deploys_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Collection_slug_key" ON "Collection"("slug");
+CREATE UNIQUE INDEX "collections_slug_key" ON "collections"("slug");
 
 -- CreateIndex
-CREATE INDEX "Page_status_idx" ON "Page"("status");
+CREATE INDEX "pages_status_idx" ON "pages"("status");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Page_collectionId_slug_key" ON "Page"("collectionId", "slug");
+CREATE UNIQUE INDEX "pages_collection_id_slug_key" ON "pages"("collection_id", "slug");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Media_s3Key_key" ON "Media"("s3Key");
+CREATE UNIQUE INDEX "media_s3_key_key" ON "media"("s3_key");
 
 -- AddForeignKey
-ALTER TABLE "Page" ADD CONSTRAINT "Page_collectionId_fkey" FOREIGN KEY ("collectionId") REFERENCES "Collection"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "pages" ADD CONSTRAINT "pages_collection_id_fkey" FOREIGN KEY ("collection_id") REFERENCES "collections"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Page" ADD CONSTRAINT "Page_coverMediaId_fkey" FOREIGN KEY ("coverMediaId") REFERENCES "Media"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "pages" ADD CONSTRAINT "pages_cover_media_id_fkey" FOREIGN KEY ("cover_media_id") REFERENCES "media"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "NavItem" ADD CONSTRAINT "NavItem_pageId_fkey" FOREIGN KEY ("pageId") REFERENCES "Page"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "nav_items" ADD CONSTRAINT "nav_items_page_id_fkey" FOREIGN KEY ("page_id") REFERENCES "pages"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

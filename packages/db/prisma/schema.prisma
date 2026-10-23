@@ -8,21 +8,30 @@ datasource db {
   provider = "postgresql"
 }
 
+// Database naming: plural snake_case tables, snake_case columns, lowercase enum values.
+// Prisma has no global naming setting, so every model, multi-word field, and enum is mapped.
+
 enum PageStatus {
-  DRAFT
-  PUBLISHED
+  DRAFT     @map("draft")
+  PUBLISHED @map("published")
+
+  @@map("page_status")
 }
 
 enum ListLayout {
-  GRID
-  LIST
+  GRID @map("grid")
+  LIST @map("list")
+
+  @@map("list_layout")
 }
 
 enum DeployStatus {
-  QUEUED
-  RUNNING
-  SUCCEEDED
-  FAILED
+  QUEUED    @map("queued")
+  RUNNING   @map("running")
+  SUCCEEDED @map("succeeded")
+  FAILED    @map("failed")
+
+  @@map("deploy_status")
 }
 
 /// A group of pages, e.g. projects, writing, photography. Index at /<slug>/.
@@ -31,10 +40,12 @@ model Collection {
   slug        String     @unique
   title       String
   description String?
-  listLayout  ListLayout @default(GRID)
+  listLayout  ListLayout @default(GRID) @map("list_layout")
   pages       Page[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@map("collections")
 }
 
 /// A page at /<slug>/, or /<collection>/<slug>/ when it belongs to a collection.
@@ -46,53 +57,129 @@ model Page {
   /// Tiptap document, validated by @portfolio/contracts.
   body           Json
   status         PageStatus  @default(DRAFT)
-  publishedAt    DateTime?
+  publishedAt    DateTime?   @map("published_at")
   /// Date shown on the page and used for ordering within a collection.
-  sortDate       DateTime    @default(now())
+  sortDate       DateTime    @default(now()) @map("sort_date")
   tags           String[]
-  seoTitle       String?
-  seoDescription String?
-  collectionId   String?
+  seoTitle       String?     @map("seo_title")
+  seoDescription String?     @map("seo_description")
+  collectionId   String?     @map("collection_id")
   collection     Collection? @relation(fields: [collectionId], references: [id], onDelete: Restrict)
-  coverMediaId   String?
+  coverMediaId   String?     @map("cover_media_id")
   coverMedia     Media?      @relation(fields: [coverMediaId], references: [id], onDelete: SetNull)
   navItems       NavItem[]
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
 
   @@unique([collectionId, slug])
   @@index([status])
+  @@map("pages")
 }
 
 model Media {
   id        String   @id @default(uuid(7))
-  s3Key     String   @unique
-  mimeType  String
+  s3Key     String   @unique @map("s3_key")
+  mimeType  String   @map("mime_type")
   size      Int
   width     Int?
   height    Int?
   alt       String   @default("")
   caption   String?
   coverOf   Page[]
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("media")
 }
 
 /// Site navigation. Links to a page, or to an arbitrary href.
 model NavItem {
-  id     String  @id @default(uuid(7))
-  label  String
-  order  Int
-  pageId String?
-  page   Page?   @relation(fields: [pageId], references: [id], onDelete: Cascade)
-  href   String?
+  id       String  @id @default(uuid(7))
+  label    String
+  position Int
+  pageId   String? @map("page_id")
+  page     Page?   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  href     String?
+
+  @@map("nav_items")
 }
 
 model Deploy {
   id          String       @id @default(uuid(7))
   status      DeployStatus @default(QUEUED)
-  triggeredBy String?
-  githubRunId String?
+  triggeredBy String?      @map("triggered_by")
+  githubRunId String?      @map("github_run_id")
   error       String?
-  createdAt   DateTime     @default(now())
-  finishedAt  DateTime?
+  createdAt   DateTime     @default(now()) @map("created_at")
+  finishedAt  DateTime?    @map("finished_at")
+
+  @@map("deploys")
+}
+
+// --- Better Auth (core + admin plugin). Field names must match what Better Auth expects;
+// it goes through the Prisma client, so only the database names are mapped.
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false) @map("email_verified")
+  image         String?
+  role          String?
+  banned        Boolean?  @default(false)
+  banReason     String?   @map("ban_reason")
+  banExpires    DateTime? @map("ban_expires")
+  sessions      Session[]
+  accounts      Account[]
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Session {
+  id             String   @id
+  token          String   @unique
+  expiresAt      DateTime @map("expires_at")
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+  impersonatedBy String?  @map("impersonated_by")
+  userId         String   @map("user_id")
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String    @map("account_id")
+  providerId            String    @map("provider_id")
+  userId                String    @map("user_id")
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?   @map("access_token")
+  refreshToken          String?   @map("refresh_token")
+  idToken               String?   @map("id_token")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  refreshTokenExpiresAt DateTime? @map("refresh_token_expires_at")
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([identifier])
+  @@map("verifications")
 }

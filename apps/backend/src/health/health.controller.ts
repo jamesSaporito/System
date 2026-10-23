@@ -1,7 +1,9 @@
 import { Controller, Get, Logger, ServiceUnavailableException } from "@nestjs/common";
 import type { HealthResponse } from "@portfolio/contracts";
+import { AllowAnonymous } from "../auth/allow-anonymous.decorator";
 import { PrismaService } from "../prisma/prisma.service";
 
+@AllowAnonymous()
 @Controller("health")
 export class HealthController {
   private readonly logger = new Logger(HealthController.name);
