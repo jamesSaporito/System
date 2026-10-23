@@ -1,0 +1,98 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum PageStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum ListLayout {
+  GRID
+  LIST
+}
+
+enum DeployStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+/// A group of pages, e.g. projects, writing, photography. Index at /<slug>/.
+model Collection {
+  id          String     @id @default(uuid(7))
+  slug        String     @unique
+  title       String
+  description String?
+  listLayout  ListLayout @default(GRID)
+  pages       Page[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+/// A page at /<slug>/, or /<collection>/<slug>/ when it belongs to a collection.
+model Page {
+  id             String      @id @default(uuid(7))
+  slug           String
+  title          String
+  summary        String?
+  /// Tiptap document, validated by @portfolio/contracts.
+  body           Json
+  status         PageStatus  @default(DRAFT)
+  publishedAt    DateTime?
+  /// Date shown on the page and used for ordering within a collection.
+  sortDate       DateTime    @default(now())
+  tags           String[]
+  seoTitle       String?
+  seoDescription String?
+  collectionId   String?
+  collection     Collection? @relation(fields: [collectionId], references: [id], onDelete: Restrict)
+  coverMediaId   String?
+  coverMedia     Media?      @relation(fields: [coverMediaId], references: [id], onDelete: SetNull)
+  navItems       NavItem[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@unique([collectionId, slug])
+  @@index([status])
+}
+
+model Media {
+  id        String   @id @default(uuid(7))
+  s3Key     String   @unique
+  mimeType  String
+  size      Int
+  width     Int?
+  height    Int?
+  alt       String   @default("")
+  caption   String?
+  coverOf   Page[]
+  createdAt DateTime @default(now())
+}
+
+/// Site navigation. Links to a page, or to an arbitrary href.
+model NavItem {
+  id     String  @id @default(uuid(7))
+  label  String
+  order  Int
+  pageId String?
+  page   Page?   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  href   String?
+}
+
+model Deploy {
+  id          String       @id @default(uuid(7))
+  status      DeployStatus @default(QUEUED)
+  triggeredBy String?
+  githubRunId String?
+  error       String?
+  createdAt   DateTime     @default(now())
+  finishedAt  DateTime?
+}

@@ -12,8 +12,11 @@
     "typecheck": "turbo run typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "preview": "turbo run build --filter=@portfolio/web && pnpm --filter=@portfolio/web preview",
-    "dev:docker": "docker compose up --build web",
+    "preview": "turbo run build --filter=@portfolio/public && pnpm --filter=@portfolio/public preview",
+    "services:up": "docker compose up -d postgres s3mock",
+    "db:migrate": "pnpm --filter=@portfolio/db db:migrate",
+    "db:studio": "pnpm --filter=@portfolio/db db:studio",
+    "dev:docker": "docker compose up --build",
     "preview:docker": "docker compose --profile preview up --build preview"
   },
   "devDependencies": {

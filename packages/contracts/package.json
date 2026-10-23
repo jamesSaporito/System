@@ -1,0 +1,20 @@
+{
+  "name": "@portfolio/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "oxlint --type-aware",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@portfolio/config": "workspace:*",
+    "typescript": "7.0.2"
+  }
+}

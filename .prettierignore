@@ -3,3 +3,4 @@ pnpm-lock.yaml
 **/out
 **/dist
 **/.turbo
+**/src/generated

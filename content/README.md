@@ -1,6 +1,6 @@
 # Content
 
-MDX content rendered at build time by `apps/web`.
+MDX content rendered at build time by `apps/public`.
 
 ## Projects
 

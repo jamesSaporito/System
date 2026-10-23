@@ -1,0 +1,29 @@
+{
+  "name": "@portfolio/backend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsdown --watch --on-success \"node --env-file-if-exists=../../.env --enable-source-maps dist/main.mjs\"",
+    "build": "tsdown",
+    "start": "node --enable-source-maps dist/main.mjs",
+    "lint": "oxlint --type-aware",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nestjs/common": "12.1.2",
+    "@nestjs/core": "12.1.2",
+    "@nestjs/platform-express": "12.1.2",
+    "@portfolio/contracts": "workspace:*",
+    "@portfolio/db": "workspace:*",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@portfolio/config": "workspace:*",
+    "@types/node": "24.19.2",
+    "tsdown": "0.23.0",
+    "typescript": "7.0.2"
+  }
+}

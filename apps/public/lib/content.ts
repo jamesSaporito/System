@@ -2,7 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { getFrontmatter } from "next-mdx-remote-client/utils";
 
-// Resolved from apps/web, which is the cwd for `next build` and `next dev`.
+// Resolved from apps/public, which is the cwd for `next build` and `next dev`.
 const CONTENT_DIR = path.resolve(process.cwd(), "../../content");
 const PROJECTS_DIR = path.join(CONTENT_DIR, "projects");
 
