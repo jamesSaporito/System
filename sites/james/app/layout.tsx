@@ -5,7 +5,7 @@ import { navItems } from "@/lib/nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: { default: "Portfolio", template: "%s | Portfolio" },
+  title: { default: "James Saporito", template: "%s | James Saporito" },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
