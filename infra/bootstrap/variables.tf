@@ -9,3 +9,9 @@ variable "github_repository" {
   type        = string
   default     = "jamesSaporito/System"
 }
+
+variable "site_buckets" {
+  description = "Site buckets (envs/prod static-site modules) the deploy role may sync to."
+  type        = list(string)
+  default     = ["jamessaporito-com-site"]
+}

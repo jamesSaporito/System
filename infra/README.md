@@ -2,24 +2,24 @@
 
 Terraform for AWS (Terraform `~> 1.17`, AWS provider `~> 6.70`, region `us-east-1`).
 
-| Path                   | Purpose                                                                                                                                                       |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `bootstrap/`           | Applied once from a laptop, with local state: the S3 bucket for every other stack's state, and the GitHub Actions OIDC provider plus `plan` / `apply` roles.  |
-| `envs/prod/`           | Production: a private VPC and the Aurora PostgreSQL database (off until `enable_database = true`). Planned by `.github/workflows/infra.yml`, applied by hand. |
-| `modules/network/`     | Private-only VPC: one subnet per availability zone, no internet gateway or NAT.                                                                               |
-| `modules/database/`    | Aurora PostgreSQL 18 Serverless v2 that pauses when idle, with a generated password in Secrets Manager.                                                       |
-| `modules/static-site/` | Planned: private S3 bucket (Origin Access Control), CloudFront, ACM certificate.                                                                              |
+| Path                   | Purpose                                                                                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `bootstrap/`           | Applied once from a laptop, with local state: the S3 bucket for every other stack's state, and the GitHub Actions OIDC provider plus `plan` / `apply` / `deploy` roles.                          |
+| `envs/prod/`           | Production: the `jamessaporito.com` site, plus a private VPC and the Aurora PostgreSQL database (off until `enable_database = true`). Planned by `.github/workflows/infra.yml`, applied by hand. |
+| `modules/network/`     | Private-only VPC: one subnet per availability zone, no internet gateway or NAT.                                                                                                                  |
+| `modules/database/`    | Aurora PostgreSQL 18 Serverless v2 that pauses when idle, with a generated password in Secrets Manager.                                                                                          |
+| `modules/static-site/` | One site: private S3 bucket (Origin Access Control), CloudFront with a clean-URL function, ACM certificate.                                                                                      |
 
 ## First-time setup
 
 1. Install Terraform 1.17 (`brew install hashicorp/tap/terraform`) and sign in to AWS (see [Running Terraform locally](#running-terraform-locally)).
-2. Bootstrap, then note the three outputs:
+2. Bootstrap, then note its outputs:
    ```sh
    cd infra/bootstrap
    terraform init && terraform apply
    ```
    Its `terraform.tfstate` stays on your machine (gitignored). Keep a copy somewhere safe; if it's lost, the resources can be re-imported.
-3. In GitHub, under **Settings → Secrets and variables → Actions → Variables**, add `TF_STATE_BUCKET`, `AWS_PLAN_ROLE_ARN` and `AWS_APPLY_ROLE_ARN` from those outputs. Under **Settings → Environments**, create `production`; add yourself as a required reviewer to make each apply wait for approval.
+3. In GitHub, under **Settings → Secrets and variables → Actions → Variables**, add `TF_STATE_BUCKET`, `AWS_PLAN_ROLE_ARN`, `AWS_APPLY_ROLE_ARN` and `AWS_DEPLOY_ROLE_ARN` from those outputs. Under **Settings → Environments**, create `production`; add yourself as a required reviewer to make each apply wait for approval.
 4. Create production, either from GitHub (**Actions → Infra → Run workflow** on `main`) or locally:
    ```sh
    cd infra/envs/prod
@@ -27,6 +27,18 @@ Terraform for AWS (Terraform `~> 1.17`, AWS provider `~> 6.70`, region `us-east-
    terraform init -backend-config=backend.hcl
    terraform apply
    ```
+5. Put the site live, see [Going live](#going-live).
+
+## Going live
+
+DNS stays at the registrar (Squarespace), so a few records are added there by hand. For `jamessaporito.com`:
+
+1. After the first prod apply, add the `site_james_bucket` and `site_james_distribution_id` outputs as the GitHub variables `SITE_JAMES_BUCKET` and `SITE_JAMES_DISTRIBUTION_ID`.
+2. At the registrar, add each CNAME from the `site_james_certificate_validation` output, and wait until the certificate shows **Issued** in ACM (usually minutes).
+3. Set `attach_domain = true` on `module "site_james"` in `envs/prod/main.tf`, commit, and apply again. With it on before the records exist, the apply waits on validation.
+4. At the registrar, point `www` at the `site_james_cloudfront_domain` output with a CNAME, and forward the bare domain to `https://www.jamessaporito.com` (a bare domain can't have a CNAME).
+5. Upload the photos: `S3_ENDPOINT= MEDIA_BUCKET=jamessaporito-com-site pnpm media:push` (from `sites/james`).
+6. Deploy: push a change under `sites/james`, or run **Actions → Deploy james → Run workflow**.
 
 ## Running Terraform locally
 
@@ -70,9 +82,11 @@ GitHub Actions doesn't use these profiles; it assumes the bootstrap's OIDC roles
 
 - Remote state in S3 with native locking (`use_lockfile = true`); no DynamoDB table.
 - Production migrations (`prisma migrate deploy`) run only as an automated one-off task inside AWS, in the VPC with the database client security group, triggered by the deploy pipeline. Never manually from a laptop.
-- CI authenticates via GitHub OIDC; no long-lived AWS keys. The `plan` role (read-only) trusts pull requests and pushes to `main`; the `apply` role trusts only jobs in the `production` environment.
+- CI authenticates via GitHub OIDC; no long-lived AWS keys. The `plan` role (read-only) trusts pull requests and pushes to `main`; the `apply` role trusts only jobs in the `production` environment; the `deploy` role trusts `main` and can only sync the site buckets and invalidate CloudFront.
 - Pull requests and pushes to `main` only plan. Applying is always a deliberate step: run the Infra workflow on `main` (or apply locally).
 - The database is off by default (`enable_database = false` in `envs/prod`), so applying production for the sites doesn't create Aurora. Turn it on when the backend needs it.
-- The repository is public, so account-specific values (the state bucket name, role ARNs) live in GitHub variables and a gitignored `backend.hcl`, not in code.
+- The repository is public, so account-specific values (the state bucket name, role ARNs) live in GitHub variables and a gitignored `backend.hcl`, not in code. Site bucket names come from the domain, so they need no account ID.
 - CloudFront must match `docker/nginx.conf.template`: a viewer-request CloudFront Function rewrites clean URLs to `index.html`, and 403/404 from S3 map to `/404.html` with a 404 status.
 - One `static-site` instance per site (`sites/<slug>`), each with its own bucket, distribution and certificate. The bucket also holds the site's photos under `media/` (uploaded with `pnpm media:push`), served from the same origin at `/media/*`; site deploys must not delete that prefix.
+- Caching: `/_next/static/*` is immutable for a year; HTML and photos stay at the edge for a day, and each deploy invalidates `/*`. Browsers re-check HTML on every visit.
+- After any Terraform change, follow the `infracost` skill (`.claude/skills/infracost/SKILL.md`).

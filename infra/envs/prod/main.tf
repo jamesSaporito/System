@@ -19,3 +19,14 @@ module "database" {
   vpc_id     = module.network[0].vpc_id
   subnet_ids = module.network[0].private_subnet_ids
 }
+
+# jamessaporito.com (sites/james). DNS stays at the registrar: add the certificate_validation
+# records there, then set attach_domain = true and point www at the CloudFront domain.
+module "site_james" {
+  source = "../../modules/static-site"
+
+  domain        = "jamessaporito.com"
+  aliases       = ["jamessaporito.com", "www.jamessaporito.com"]
+  bucket_name   = "jamessaporito-com-site"
+  attach_domain = true
+}

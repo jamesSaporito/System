@@ -1,0 +1,78 @@
+# Builds sites/james and publishes it to its S3 bucket behind CloudFront (infra/modules/static-site).
+# Needs the repository variables AWS_DEPLOY_ROLE_ARN (output of infra/bootstrap), SITE_JAMES_BUCKET
+# and SITE_JAMES_DISTRIBUTION_ID (outputs of infra/envs/prod); skipped until SITE_JAMES_BUCKET is
+# set. Photos under media/ are uploaded separately with `pnpm media:push` and never deleted here.
+name: Deploy james
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "sites/james/**"
+      - "packages/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/deploy-site-james.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never let two deploys interleave their syncs; a newer push waits for the current one.
+concurrency:
+  group: deploy-site-james
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.SITE_JAMES_BUCKET != '' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      BUCKET: ${{ vars.SITE_JAMES_BUCKET }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # pnpm version comes from `packageManager` in package.json.
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm turbo run build --filter=@portfolio/site-james
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      # New hashed assets go up before the HTML that references them. They're immutable; everything
+      # else is re-checked by browsers on each visit (CloudFront caches it until the invalidation).
+      - name: Upload
+        working-directory: sites/james/out
+        run: |
+          aws s3 sync _next/static "s3://$BUCKET/_next/static" \
+            --cache-control "public,max-age=31536000,immutable"
+          aws s3 sync . "s3://$BUCKET" --delete --exclude "media/*" --exclude "_next/static/*" \
+            --cache-control "public,max-age=0,must-revalidate"
+
+      - name: Invalidate CloudFront
+        run: |
+          id=$(aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" \
+            --paths "/*" --query Invalidation.Id --output text)
+          aws cloudfront wait invalidation-completed --distribution-id "$DISTRIBUTION_ID" --id "$id"
+        env:
+          DISTRIBUTION_ID: ${{ vars.SITE_JAMES_DISTRIBUTION_ID }}
+
+      # Only once no cached page can reference them, drop the previous build's assets.
+      - name: Remove old assets
+        working-directory: sites/james/out
+        run: aws s3 sync _next/static "s3://$BUCKET/_next/static" --delete

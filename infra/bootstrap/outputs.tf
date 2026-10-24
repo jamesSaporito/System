@@ -15,3 +15,8 @@ output "apply_role_arn" {
   description = "AWS_APPLY_ROLE_ARN: assumed by applies in the production environment."
   value       = aws_iam_role.github["apply"].arn
 }
+
+output "deploy_role_arn" {
+  description = "AWS_DEPLOY_ROLE_ARN: assumed by site deploys on main."
+  value       = aws_iam_role.github["deploy"].arn
+}

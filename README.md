@@ -83,7 +83,7 @@ cwebp -q 80 -resize 2200 0 -metadata none media-originals/motorcycle/hero.jpeg -
 `pnpm media:push` uploads new or changed files to the `media/` prefix of the site's bucket, and `pnpm media:pull` downloads anything you don't have locally (new machine, or after a teammate's push).
 
 - Locally the bucket is `site-<slug>` in [s3mock](https://github.com/adobe/S3Mock), and `next dev` loads photos from it (`sites/<slug>/.env.development`).
-- In production CloudFront serves them from the site's own domain at `/media/`. To sync with real S3, run with `S3_ENDPOINT=` (empty), `MEDIA_BUCKET=<bucket>`, and your AWS credentials or `AWS_PROFILE`.
+- In production CloudFront serves them from the site's own domain at `/media/`. To sync with real S3, run with `S3_ENDPOINT=` (empty), `MEDIA_BUCKET=<bucket>` (`jamessaporito-com-site` for `sites/james`), and your AWS credentials or `AWS_PROFILE`.
 - Run the commands from `sites/<slug>` to sync only that site.
 
 ## Sites and access

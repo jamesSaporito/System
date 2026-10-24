@@ -91,6 +91,8 @@ data "aws_iam_policy_document" "github_trust" {
     ]
     # Jobs that run in the `production` GitHub environment: manual applies on main.
     apply = ["repo:${var.github_repository}:environment:production"]
+    # Site deploys: pushes to main and manual runs from main.
+    deploy = ["repo:${var.github_repository}:ref:refs/heads/main"]
   }
 
   statement {
@@ -134,7 +136,7 @@ resource "aws_iam_role_policy_attachment" "apply_admin" {
   policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
 }
 
-# Both roles read and write state, including the lock file Terraform creates during a plan.
+# Plan and apply read and write state, including the lock file Terraform creates during a plan.
 data "aws_iam_policy_document" "state_access" {
   statement {
     actions   = ["s3:ListBucket"]
@@ -148,9 +150,33 @@ data "aws_iam_policy_document" "state_access" {
 }
 
 resource "aws_iam_role_policy" "state_access" {
-  for_each = aws_iam_role.github
+  for_each = { for k, r in aws_iam_role.github : k => r if k != "deploy" }
 
   name   = "terraform-state"
   role   = each.value.id
   policy = data.aws_iam_policy_document.state_access.json
+}
+
+# Deploys sync a site's build into its bucket and clear the CloudFront cache; nothing else.
+data "aws_iam_policy_document" "deploy" {
+  statement {
+    actions   = ["s3:ListBucket"]
+    resources = [for b in var.site_buckets : "arn:aws:s3:::${b}"]
+  }
+
+  statement {
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
+    resources = [for b in var.site_buckets : "arn:aws:s3:::${b}/*"]
+  }
+
+  statement {
+    actions   = ["cloudfront:CreateInvalidation", "cloudfront:GetInvalidation"]
+    resources = ["arn:aws:cloudfront::${data.aws_caller_identity.current.account_id}:distribution/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "deploy" {
+  name   = "site-deploy"
+  role   = aws_iam_role.github["deploy"].id
+  policy = data.aws_iam_policy_document.deploy.json
 }
