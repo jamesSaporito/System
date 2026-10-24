@@ -14,6 +14,8 @@ next-env.d.ts
 
 # Site photos: synced to S3 with `pnpm media:push` / `media:pull`, never committed
 sites/*/media/
+# Full-size originals kept locally; resized copies go in media/
+sites/*/media-originals/
 
 # Env
 .env

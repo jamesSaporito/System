@@ -74,7 +74,13 @@ Task ordering lives in `turbo.json`: `@portfolio/db` owns `db:up` (start Postgre
 
 Each site's text and layout are code in `sites/<slug>` (for example `sites/james/app/motorcycle/page.tsx`); changes ship by committing and deploying.
 
-Photos are kept out of git. Put originals in `sites/<slug>/media/` (gitignored), mirroring the URL structure, and reference them in code with `mediaUrl("motorcycle/hero.jpg")` from `@/lib/media`. `pnpm media:push` uploads new or changed files to the `media/` prefix of the site's bucket, and `pnpm media:pull` downloads anything you don't have locally (new machine, or after a teammate's push).
+Photos are kept out of git. Keep full-size originals in `sites/<slug>/media-originals/` and put web-ready copies in `sites/<slug>/media/` (both gitignored), one folder per page, and reference them in code with `mediaUrl("motorcycle/hero.webp")` from `@/lib/media`. To make a web-ready copy (about 2200px wide WebP, metadata stripped; needs `brew install webp`):
+
+```sh
+cwebp -q 80 -resize 2200 0 -metadata none media-originals/motorcycle/hero.jpeg -o media/motorcycle/hero.webp
+```
+
+`pnpm media:push` uploads new or changed files to the `media/` prefix of the site's bucket, and `pnpm media:pull` downloads anything you don't have locally (new machine, or after a teammate's push).
 
 - Locally the bucket is `site-<slug>` in [s3mock](https://github.com/adobe/S3Mock), and `next dev` loads photos from it (`sites/<slug>/.env.development`).
 - In production CloudFront serves them from the site's own domain at `/media/`. To sync with real S3, run with `S3_ENDPOINT=` (empty), `MEDIA_BUCKET=<bucket>`, and your AWS credentials or `AWS_PROFILE`.
