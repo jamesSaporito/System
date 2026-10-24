@@ -37,7 +37,7 @@ DNS stays at the registrar (Squarespace), so a few records are added there by ha
 2. At the registrar, add each CNAME from the `site_james_certificate_validation` output, and wait until the certificate shows **Issued** in ACM (usually minutes).
 3. Set `attach_domain = true` on `module "site_james"` in `envs/prod/main.tf`, commit, and apply again. With it on before the records exist, the apply waits on validation.
 4. At the registrar, point `www` at the `site_james_cloudfront_domain` output with a CNAME, and forward the bare domain to `https://www.jamessaporito.com` (a bare domain can't have a CNAME).
-5. Upload the photos: `S3_ENDPOINT= MEDIA_BUCKET=jamessaporito-com-site pnpm media:push` (from `sites/james`).
+5. Upload the photos: `pnpm media:push:prod` (from `sites/james`, with `AWS_PROFILE` set).
 6. Deploy: push a change under `sites/james`, or run **Actions → Deploy james → Run workflow**.
 
 ## Running Terraform locally

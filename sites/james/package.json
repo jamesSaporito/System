@@ -10,6 +10,7 @@
     "media:up": "[ -n \"$DEV_CONTAINER\" ] || docker compose up -d --wait s3mock",
     "media:push": "portfolio-media push",
     "media:pull": "portfolio-media pull",
+    "media:push:prod": "S3_ENDPOINT= MEDIA_BUCKET=jamessaporito-com-site portfolio-media push",
     "lint": "oxlint --type-aware",
     "typecheck": "next typegen && tsc --noEmit"
   },
