@@ -1,135 +1,79 @@
 import { createPrismaClient } from "@portfolio/db";
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { z } from "zod";
-import type { Env } from "../env";
-import { ACCOUNT_NOT_ALLOWED, createAuth } from "./auth";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  createTestApp,
+  fakeGithub,
+  type TestApp,
+  TEST_EMAIL_DOMAIN,
+  testEnv,
+} from "../test/support";
+import { ACCOUNT_NOT_ALLOWED } from "./auth";
 
-const ALLOWED_ID = 1001;
-const STRANGER_ID = 1003;
-const TEST_EMAIL_DOMAIN = "@auth-test.invalid";
-const ADMIN_URL = "http://localhost:3001";
-const BACKEND_URL = "http://localhost:4000";
+const PLATFORM_ADMIN = 1000;
+const INVITED = 1001;
+const STRANGER = 1002;
+const SITE_SLUG = "auth-test-site";
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) throw new Error("DATABASE_URL is required; see .env.example");
+const env = testEnv({ ADMIN_GITHUB_IDS: [String(PLATFORM_ADMIN)] });
+const prisma = createPrismaClient(env.DATABASE_URL);
+let testApp: TestApp;
 
-const prisma = createPrismaClient(databaseUrl);
-
-const env: Env = {
-  PORT: 0,
-  DATABASE_URL: databaseUrl,
-  BETTER_AUTH_URL: BACKEND_URL,
-  BETTER_AUTH_SECRET: "test-secret-test-secret-test-secret",
-  GITHUB_CLIENT_ID: "test",
-  GITHUB_CLIENT_SECRET: "test",
-  ADMIN_GITHUB_IDS: [String(ALLOWED_ID)],
-  ADMIN_URL,
-};
-
-/** Fakes GitHub's OAuth token exchange and user APIs for one GitHub account. */
-function fakeGithub(githubId: number) {
-  const email = `${githubId}${TEST_EMAIL_DOMAIN}`;
-  vi.stubGlobal("fetch", async (input: string | URL | Request) => {
-    const url = input instanceof Request ? input.url : String(input);
-    if (url.startsWith("https://github.com/login/oauth/access_token")) {
-      return Response.json({ access_token: "gh-token", token_type: "bearer", scope: "read:user" });
-    }
-    if (url === "https://api.github.com/user") {
-      return Response.json({
-        id: githubId,
-        login: `user${githubId}`,
-        name: null,
-        email,
-        avatar_url: null,
-      });
-    }
-    if (url === "https://api.github.com/user/emails") {
-      return Response.json([{ email, primary: true, verified: true }]);
-    }
-    throw new Error(`Unexpected fetch in test: ${url}`);
-  });
-}
-
-/** Runs the browser flow: start GitHub sign-in, then hit the callback as GitHub would redirect. */
-async function signInWithGithub(auth: ReturnType<typeof createAuth>) {
-  const start = await auth.handler(
-    new Request(`${BACKEND_URL}/api/auth/sign-in/social`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Origin: ADMIN_URL },
-      body: JSON.stringify({
-        provider: "github",
-        callbackURL: `${ADMIN_URL}/`,
-        errorCallbackURL: `${ADMIN_URL}/sign-in/`,
-      }),
-    }),
-  );
-  const { url } = z.object({ url: z.string() }).parse(await start.json());
-  const state = new URL(url).searchParams.get("state");
-  const cookies = start.headers
-    .getSetCookie()
-    .map((cookie) => cookie.split(";")[0])
-    .join("; ");
-
-  const callback = await auth.handler(
-    new Request(`${BACKEND_URL}/api/auth/callback/github?code=test-code&state=${state}`, {
-      headers: { Cookie: cookies },
-    }),
-  );
-  return new URL(callback.headers.get("Location") ?? "", ADMIN_URL);
-}
-
-async function sessionCount(githubId: number) {
-  return prisma.session.count({ where: { user: { email: `${githubId}${TEST_EMAIL_DOMAIN}` } } });
-}
-
-beforeEach(async () => {
+async function cleanUp() {
   await prisma.user.deleteMany({ where: { email: { endsWith: TEST_EMAIL_DOMAIN } } });
+  await prisma.site.deleteMany({ where: { slug: SITE_SLUG } });
+}
+
+beforeAll(async () => {
+  fakeGithub();
+  testApp = await createTestApp(env);
 });
 
-afterEach(() => {
+beforeEach(cleanUp);
+
+afterAll(async () => {
+  await cleanUp();
+  await testApp.app.close();
+  await prisma.$disconnect();
   vi.unstubAllGlobals();
 });
 
-afterAll(async () => {
-  await prisma.user.deleteMany({ where: { email: { endsWith: TEST_EMAIL_DOMAIN } } });
-  await prisma.$disconnect();
-});
+describe("GitHub sign-in", () => {
+  it("lets platform admins in", async () => {
+    const result = await testApp.signIn(PLATFORM_ADMIN);
+    expect(result).toHaveProperty("cookie");
+  });
 
-describe("GitHub sign-in allowlist", () => {
-  it("creates allowlisted users as admins and signs them in", async () => {
-    fakeGithub(ALLOWED_ID);
-    const redirect = await signInWithGithub(createAuth(env, prisma));
-
-    expect(redirect.href).toBe(`${ADMIN_URL}/`);
-    const user = await prisma.user.findUnique({
-      where: { email: `${ALLOWED_ID}${TEST_EMAIL_DOMAIN}` },
-      include: { accounts: true },
+  it("turns an invite into a membership on first sign-in", async () => {
+    const site = await prisma.site.create({ data: { slug: SITE_SLUG, name: "Test" } });
+    await prisma.siteInvite.create({
+      data: { siteId: site.id, githubId: String(INVITED), githubLogin: "invited", role: "EDITOR" },
     });
-    expect(user?.role).toBe("admin");
-    expect(user?.accounts).toMatchObject([{ providerId: "github", accountId: String(ALLOWED_ID) }]);
-    expect(await sessionCount(ALLOWED_ID)).toBe(1);
+
+    expect(await testApp.signIn(INVITED)).toHaveProperty("cookie");
+
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { email: `${INVITED}${TEST_EMAIL_DOMAIN}` },
+      include: { memberships: true },
+    });
+    expect(user.memberships).toMatchObject([{ siteId: site.id, role: "EDITOR" }]);
+    expect(await prisma.siteInvite.count({ where: { siteId: site.id } })).toBe(0);
   });
 
   it("refuses anyone else without creating a user", async () => {
-    fakeGithub(STRANGER_ID);
-    const redirect = await signInWithGithub(createAuth(env, prisma));
-
-    expect(redirect.pathname).toBe("/sign-in/");
-    expect(redirect.searchParams.get("error")).toBe(ACCOUNT_NOT_ALLOWED);
-    expect(
-      await prisma.user.count({ where: { email: `${STRANGER_ID}${TEST_EMAIL_DOMAIN}` } }),
-    ).toBe(0);
+    expect(await testApp.signIn(STRANGER)).toEqual({ error: ACCOUNT_NOT_ALLOWED });
+    expect(await prisma.user.count({ where: { email: `${STRANGER}${TEST_EMAIL_DOMAIN}` } })).toBe(
+      0,
+    );
   });
 
-  it("refuses returning users once removed from the allowlist", async () => {
-    fakeGithub(ALLOWED_ID);
-    await signInWithGithub(createAuth(env, prisma));
-    expect(await sessionCount(ALLOWED_ID)).toBe(1);
+  it("refuses members once they've been removed from their last site", async () => {
+    const site = await prisma.site.create({ data: { slug: SITE_SLUG, name: "Test" } });
+    await prisma.siteInvite.create({
+      data: { siteId: site.id, githubId: String(INVITED), githubLogin: "invited", role: "EDITOR" },
+    });
+    await testApp.signIn(INVITED);
+    await prisma.siteMember.deleteMany({ where: { siteId: site.id } });
 
-    const delisted = createAuth({ ...env, ADMIN_GITHUB_IDS: ["9999"] }, prisma);
-    const redirect = await signInWithGithub(delisted);
-
-    expect(redirect.searchParams.get("error")).toBe(ACCOUNT_NOT_ALLOWED);
-    expect(await sessionCount(ALLOWED_ID)).toBe(1);
+    expect(await testApp.signIn(INVITED)).toEqual({ error: ACCOUNT_NOT_ALLOWED });
   });
 });

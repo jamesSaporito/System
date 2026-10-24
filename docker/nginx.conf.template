@@ -1,0 +1,25 @@
+# Mimics the CloudFront setup: clean URLs resolve to index.html (no redirects), unknown paths
+# return /404.html with a 404 status, and /media/ is served from the site's S3 bucket.
+# Rendered at container start; ${SITE} is substituted from the environment.
+server {
+    listen 8080;
+    server_name _;
+    root /usr/share/nginx/html;
+
+    location / {
+        try_files $uri $uri/index.html =404;
+    }
+
+    location /_next/static/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        try_files $uri =404;
+    }
+
+    location /media/ {
+        proxy_pass http://s3mock:9090/site-${SITE}/media/;
+        # Missing photos get the site's 404 page, like CloudFront's custom error response.
+        proxy_intercept_errors on;
+    }
+
+    error_page 404 /404.html;
+}

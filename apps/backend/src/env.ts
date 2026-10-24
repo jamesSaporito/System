@@ -1,3 +1,4 @@
+import { Global, Module } from "@nestjs/common";
 import { z } from "zod";
 
 const envSchema = z.object({
@@ -8,7 +9,7 @@ const envSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(32),
   GITHUB_CLIENT_ID: z.string().min(1),
   GITHUB_CLIENT_SECRET: z.string().min(1),
-  /// Comma-separated numeric GitHub user IDs allowed to sign in.
+  /// Comma-separated numeric GitHub user IDs of platform admins (create sites, manage everything).
   ADMIN_GITHUB_IDS: z
     .string()
     .transform((value) =>
@@ -31,3 +32,10 @@ export function loadEnv(): Env {
   }
   return result.data;
 }
+
+/** Injection token for the validated environment. Tests override it with their own values. */
+export const ENV = Symbol("ENV");
+
+@Global()
+@Module({ providers: [{ provide: ENV, useFactory: loadEnv }], exports: [ENV] })
+export class EnvModule {}

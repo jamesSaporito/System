@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   output: "export",
   trailingSlash: true,
   images: { unoptimized: true },
-  transpilePackages: ["@portfolio/ui"],
+  transpilePackages: ["@portfolio/contracts", "@portfolio/ui"],
 };
 
 export default nextConfig;

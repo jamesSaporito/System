@@ -5,4 +5,9 @@ import { defineConfig } from "vitest/config";
 const rootEnv = new URL("../../.env", import.meta.url);
 if (existsSync(rootEnv)) process.loadEnvFile(rootEnv);
 
-export default defineConfig({});
+export default defineConfig({
+  test: {
+    // Test files share one database, so they run one at a time.
+    fileParallelism: false,
+  },
+});

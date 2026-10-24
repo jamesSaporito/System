@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - packages/*
+  - sites/*
 
 # Prisma's install scripts aren't needed: engines are fetched on first CLI use.
 allowBuilds:

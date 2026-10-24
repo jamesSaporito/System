@@ -23,6 +23,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@nestjs/testing": "12.1.2",
     "@portfolio/config": "workspace:*",
     "@types/express": "5.0.6",
     "@types/node": "24.19.2",

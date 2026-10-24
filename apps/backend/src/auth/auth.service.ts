@@ -1,5 +1,5 @@
-import { Injectable } from "@nestjs/common";
-import { loadEnv } from "../env";
+import { Inject, Injectable } from "@nestjs/common";
+import { ENV, type Env } from "../env";
 import { PrismaService } from "../prisma/prisma.service";
 import { type Auth, createAuth } from "./auth";
 
@@ -7,7 +7,7 @@ import { type Auth, createAuth } from "./auth";
 export class AuthService {
   readonly auth: Auth;
 
-  constructor(prisma: PrismaService) {
-    this.auth = createAuth(loadEnv(), prisma.client);
+  constructor(@Inject(ENV) env: Env, prisma: PrismaService) {
+    this.auth = createAuth(env, prisma.client);
   }
 }

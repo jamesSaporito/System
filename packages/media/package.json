@@ -1,0 +1,21 @@
+{
+  "name": "@portfolio/media",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "portfolio-media": "./src/cli.ts"
+  },
+  "scripts": {
+    "lint": "oxlint --type-aware",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.1149.0"
+  },
+  "devDependencies": {
+    "@portfolio/config": "workspace:*",
+    "@types/node": "24.19.2",
+    "typescript": "7.0.2"
+  }
+}

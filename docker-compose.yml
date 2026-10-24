@@ -9,8 +9,8 @@ x-dev: &dev
     - .:/app
     # Container-only installs so Linux binaries never collide with the host's.
     - node_modules:/app/node_modules
-    - public_node_modules:/app/apps/public/node_modules
-    - public_next:/app/apps/public/.next
+    - site_james_node_modules:/app/sites/james/node_modules
+    - site_james_next:/app/sites/james/.next
     - admin_node_modules:/app/apps/admin/node_modules
     - admin_next:/app/apps/admin/.next
     - backend_node_modules:/app/apps/backend/node_modules
@@ -18,6 +18,7 @@ x-dev: &dev
     - config_node_modules:/app/packages/config/node_modules
     - contracts_node_modules:/app/packages/contracts/node_modules
     - db_node_modules:/app/packages/db/node_modules
+    - media_node_modules:/app/packages/media/node_modules
     - pnpm_store:/home/node/.local/share/pnpm
 
 services:
@@ -26,15 +27,18 @@ services:
     <<: *dev
     command: pnpm install --frozen-lockfile
 
-  public:
+  # One service per site app in sites/<slug>, each on its own port.
+  site-james:
     <<: *dev
-    working_dir: /app/apps/public
+    working_dir: /app/sites/james
     command: pnpm turbo run dev
     ports:
       - "3000:3000"
     depends_on:
       install:
         condition: service_completed_successfully
+      s3mock:
+        condition: service_started
 
   admin:
     <<: *dev
@@ -80,18 +84,25 @@ services:
       timeout: 5s
       retries: 15
 
-  # S3 stand-in for media uploads. Root so it can write to the named volume.
+  # S3 stand-in: one bucket per site, photos under media/ (see packages/media).
+  # Root so it can write to the named volume.
   s3mock:
     image: adobe/s3mock:5.2.3
     user: "0:0"
     ports:
       - "9090:9090"
     environment:
-      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: media
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: site-james
       COM_ADOBE_TESTING_S3MOCK_STORE_ROOT: /data
       COM_ADOBE_TESTING_S3MOCK_STORE_RETAIN_FILES_ON_EXIT: "true"
     volumes:
       - s3mock_data:/data
+    # Ready once the server answers (it takes a few seconds to boot), so `up --wait` really waits.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9090/site-james"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
 
   preview:
     profiles: [preview]
@@ -99,13 +110,20 @@ services:
       context: .
       dockerfile: docker/Dockerfile
       target: preview
+      args:
+        # Which sites/<slug> to preview: `SITE=alex pnpm preview:docker`.
+        SITE: ${SITE:-james}
+    environment:
+      SITE: ${SITE:-james}
     ports:
       - "8080:8080"
+    depends_on:
+      - s3mock
 
 volumes:
   node_modules:
-  public_node_modules:
-  public_next:
+  site_james_node_modules:
+  site_james_next:
   admin_node_modules:
   admin_next:
   backend_node_modules:
@@ -113,6 +131,7 @@ volumes:
   config_node_modules:
   contracts_node_modules:
   db_node_modules:
+  media_node_modules:
   pnpm_store:
   pg_data:
   s3mock_data:

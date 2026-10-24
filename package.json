@@ -16,6 +16,8 @@
     "preview": "turbo run preview",
     "db:migrate": "pnpm --dir packages/db db:migrate",
     "db:studio": "turbo run db:studio",
+    "media:push": "turbo run media:push",
+    "media:pull": "turbo run media:pull",
     "dev:docker": "docker compose up --build",
     "preview:docker": "docker compose --profile preview up --build preview"
   },

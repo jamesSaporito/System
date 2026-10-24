@@ -1,0 +1,9 @@
+{
+  "extends": "@portfolio/config/tsconfig/base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    // Run directly by Node's type stripping, so only erasable TypeScript syntax is allowed.
+    "erasableSyntaxOnly": true
+  },
+  "include": ["src"]
+}

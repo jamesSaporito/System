@@ -1,0 +1,33 @@
+{
+  "name": "@portfolio/site-james",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --hostname 0.0.0.0",
+    "build": "next build",
+    "preview": "serve out --listen 3000",
+    "media:up": "[ -n \"$DEV_CONTAINER\" ] || docker compose up -d --wait s3mock",
+    "media:push": "portfolio-media push",
+    "media:pull": "portfolio-media pull",
+    "lint": "oxlint --type-aware",
+    "typecheck": "next typegen && tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "16.4.2",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@portfolio/config": "workspace:*",
+    "@portfolio/media": "workspace:*",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "postcss": "8.5.31",
+    "serve": "14.2.6",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2"
+  }
+}

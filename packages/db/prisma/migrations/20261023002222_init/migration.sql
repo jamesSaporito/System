@@ -1,103 +1,141 @@
 -- CreateEnum
-CREATE TYPE "page_status" AS ENUM ('draft', 'published');
-
--- CreateEnum
-CREATE TYPE "list_layout" AS ENUM ('grid', 'list');
-
--- CreateEnum
-CREATE TYPE "deploy_status" AS ENUM ('queued', 'running', 'succeeded', 'failed');
+CREATE TYPE "site_role" AS ENUM ('owner', 'editor');
 
 -- CreateTable
-CREATE TABLE "collections" (
+CREATE TABLE "sites" (
     "id" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
-    "title" TEXT NOT NULL,
-    "description" TEXT,
-    "list_layout" "list_layout" NOT NULL DEFAULT 'grid',
+    "name" TEXT NOT NULL,
+    "domain" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "collections_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "sites_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "pages" (
+CREATE TABLE "site_members" (
+    "site_id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "role" "site_role" NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "site_members_pkey" PRIMARY KEY ("site_id","user_id")
+);
+
+-- CreateTable
+CREATE TABLE "site_invites" (
     "id" TEXT NOT NULL,
-    "slug" TEXT NOT NULL,
-    "title" TEXT NOT NULL,
-    "summary" TEXT,
-    "body" JSONB NOT NULL,
-    "status" "page_status" NOT NULL DEFAULT 'draft',
-    "published_at" TIMESTAMP(3),
-    "sort_date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "tags" TEXT[],
-    "seo_title" TEXT,
-    "seo_description" TEXT,
-    "collection_id" TEXT,
-    "cover_media_id" TEXT,
+    "site_id" TEXT NOT NULL,
+    "github_id" TEXT NOT NULL,
+    "github_login" TEXT NOT NULL,
+    "role" "site_role" NOT NULL,
+    "invited_by_id" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "site_invites_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "users" (
+    "id" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "email_verified" BOOLEAN NOT NULL DEFAULT false,
+    "image" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "pages_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "media" (
+CREATE TABLE "sessions" (
     "id" TEXT NOT NULL,
-    "s3_key" TEXT NOT NULL,
-    "mime_type" TEXT NOT NULL,
-    "size" INTEGER NOT NULL,
-    "width" INTEGER,
-    "height" INTEGER,
-    "alt" TEXT NOT NULL DEFAULT '',
-    "caption" TEXT,
+    "token" TEXT NOT NULL,
+    "expires_at" TIMESTAMP(3) NOT NULL,
+    "ip_address" TEXT,
+    "user_agent" TEXT,
+    "user_id" TEXT NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "media_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "sessions_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "nav_items" (
+CREATE TABLE "accounts" (
     "id" TEXT NOT NULL,
-    "label" TEXT NOT NULL,
-    "position" INTEGER NOT NULL,
-    "page_id" TEXT,
-    "href" TEXT,
-
-    CONSTRAINT "nav_items_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "deploys" (
-    "id" TEXT NOT NULL,
-    "status" "deploy_status" NOT NULL DEFAULT 'queued',
-    "triggered_by" TEXT,
-    "github_run_id" TEXT,
-    "error" TEXT,
+    "account_id" TEXT NOT NULL,
+    "provider_id" TEXT NOT NULL,
+    "user_id" TEXT NOT NULL,
+    "access_token" TEXT,
+    "refresh_token" TEXT,
+    "id_token" TEXT,
+    "access_token_expires_at" TIMESTAMP(3),
+    "refresh_token_expires_at" TIMESTAMP(3),
+    "scope" TEXT,
+    "password" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "finished_at" TIMESTAMP(3),
+    "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "deploys_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "accounts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "verifications" (
+    "id" TEXT NOT NULL,
+    "identifier" TEXT NOT NULL,
+    "value" TEXT NOT NULL,
+    "expires_at" TIMESTAMP(3) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "verifications_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "collections_slug_key" ON "collections"("slug");
+CREATE UNIQUE INDEX "sites_slug_key" ON "sites"("slug");
 
 -- CreateIndex
-CREATE INDEX "pages_status_idx" ON "pages"("status");
+CREATE INDEX "site_members_user_id_idx" ON "site_members"("user_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "pages_collection_id_slug_key" ON "pages"("collection_id", "slug");
+CREATE INDEX "site_invites_github_id_idx" ON "site_invites"("github_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "media_s3_key_key" ON "media"("s3_key");
+CREATE UNIQUE INDEX "site_invites_site_id_github_id_key" ON "site_invites"("site_id", "github_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "sessions_token_key" ON "sessions"("token");
+
+-- CreateIndex
+CREATE INDEX "sessions_user_id_idx" ON "sessions"("user_id");
+
+-- CreateIndex
+CREATE INDEX "accounts_user_id_idx" ON "accounts"("user_id");
+
+-- CreateIndex
+CREATE INDEX "verifications_identifier_idx" ON "verifications"("identifier");
 
 -- AddForeignKey
-ALTER TABLE "pages" ADD CONSTRAINT "pages_collection_id_fkey" FOREIGN KEY ("collection_id") REFERENCES "collections"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "site_members" ADD CONSTRAINT "site_members_site_id_fkey" FOREIGN KEY ("site_id") REFERENCES "sites"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "pages" ADD CONSTRAINT "pages_cover_media_id_fkey" FOREIGN KEY ("cover_media_id") REFERENCES "media"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "site_members" ADD CONSTRAINT "site_members_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "nav_items" ADD CONSTRAINT "nav_items_page_id_fkey" FOREIGN KEY ("page_id") REFERENCES "pages"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "site_invites" ADD CONSTRAINT "site_invites_site_id_fkey" FOREIGN KEY ("site_id") REFERENCES "sites"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "site_invites" ADD CONSTRAINT "site_invites_invited_by_id_fkey" FOREIGN KEY ("invited_by_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "sessions" ADD CONSTRAINT "sessions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "accounts" ADD CONSTRAINT "accounts_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
