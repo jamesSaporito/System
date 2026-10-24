@@ -26,6 +26,8 @@ sites/*/media-originals/
 *.tfstate
 *.tfstate.*
 *.tfplan
+# Holds the account-specific state bucket name (see envs/*/backend.hcl.example)
+infra/**/backend.hcl
 
 # Logs / OS / editor
 *.log

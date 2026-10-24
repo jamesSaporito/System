@@ -1,13 +1,13 @@
 # Workflows
 
-Planned; not implemented yet.
+Only `infra.yml` exists so far; the others are planned.
 
-| Workflow     | Trigger                         | Does                                                                      |
-| ------------ | ------------------------------- | ------------------------------------------------------------------------- |
-| CI           | Pull requests                   | `pnpm install`, `lint`, `typecheck`, `build`                              |
-| Deploy sites | Push to `main`                  | Build static export, sync `sites/<slug>/out` to S3, invalidate CloudFront |
-| Infra        | PRs / push to `main` (`infra/`) | `terraform plan` on PRs, `apply` on `main`                                |
+| Workflow               | Trigger                                 | Does                                                                                                         |
+| ---------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| CI (planned)           | Pull requests                           | `pnpm install`, `lint`, `typecheck`, `build`                                                                 |
+| Deploy sites (planned) | Push to `main`                          | Build static export, sync `sites/<slug>/out` to S3, invalidate CloudFront                                    |
+| Infra (`infra.yml`)    | PRs / push to `main` (`infra/`), manual | `terraform plan` (job summary); `apply` only via **Run workflow** on `main`, in the `production` environment |
 
 The site sync must use `--exclude "media/*"` so deploys never delete photos (they're uploaded separately with `pnpm media:push`).
 
-All AWS access uses the GitHub OIDC role from `infra/bootstrap`.
+All AWS access uses the GitHub OIDC roles from `infra/bootstrap`; see `infra/README.md` for the repository variables and environment they need.
