@@ -4,6 +4,13 @@ locals {
   # Bucket names are global; the account ID keeps this one unique.
   state_bucket = "portfolio-tfstate-${data.aws_caller_identity.current.account_id}"
   github_oidc  = "token.actions.githubusercontent.com"
+
+  # OIDC subject prefix, e.g. repo:owner@123/name@456 (see var.github_repository_ids).
+  github_subject = format(
+    "repo:%s@%d/%s@%d",
+    split("/", var.github_repository)[0], var.github_repository_ids.owner,
+    split("/", var.github_repository)[1], var.github_repository_ids.repository,
+  )
 }
 
 # --- Terraform state ---------------------------------------------------------------------------
@@ -86,13 +93,13 @@ data "aws_iam_policy_document" "github_trust" {
   for_each = {
     # Read-only plans: pull requests and pushes to main.
     plan = [
-      "repo:${var.github_repository}:pull_request",
-      "repo:${var.github_repository}:ref:refs/heads/main",
+      "${local.github_subject}:pull_request",
+      "${local.github_subject}:ref:refs/heads/main",
     ]
     # Jobs that run in the `production` GitHub environment: manual applies on main.
-    apply = ["repo:${var.github_repository}:environment:production"]
+    apply = ["${local.github_subject}:environment:production"]
     # Site deploys: pushes to main and manual runs from main.
-    deploy = ["repo:${var.github_repository}:ref:refs/heads/main"]
+    deploy = ["${local.github_subject}:ref:refs/heads/main"]
   }
 
   statement {

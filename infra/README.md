@@ -82,7 +82,7 @@ GitHub Actions doesn't use these profiles; it assumes the bootstrap's OIDC roles
 
 - Remote state in S3 with native locking (`use_lockfile = true`); no DynamoDB table.
 - Production migrations (`prisma migrate deploy`) run only as an automated one-off task inside AWS, in the VPC with the database client security group, triggered by the deploy pipeline. Never manually from a laptop.
-- CI authenticates via GitHub OIDC; no long-lived AWS keys. The `plan` role (read-only) trusts pull requests and pushes to `main`; the `apply` role trusts only jobs in the `production` environment; the `deploy` role trusts `main` and can only sync the site buckets and invalidate CloudFront.
+- CI authenticates via GitHub OIDC; no long-lived AWS keys. The `plan` role (read-only) trusts pull requests and pushes to `main`; the `apply` role trusts only jobs in the `production` environment; the `deploy` role trusts `main` and can only sync the site buckets and invalidate CloudFront. Trust matches GitHub's ID-based OIDC subject (`repo:jamesSaporito@<owner id>/System@<repo id>:…`), so if the repository is renamed or moved, update `github_repository` and `github_repository_ids` in `bootstrap/variables.tf` and re-apply.
 - Pull requests and pushes to `main` only plan. Applying is always a deliberate step: run the Infra workflow on `main` (or apply locally).
 - The database is off by default (`enable_database = false` in `envs/prod`), so applying production for the sites doesn't create Aurora. Turn it on when the backend needs it.
 - The repository is public, so account-specific values (the state bucket name, role ARNs) live in GitHub variables and a gitignored `backend.hcl`, not in code. Site bucket names come from the domain, so they need no account ID.
