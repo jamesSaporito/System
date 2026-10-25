@@ -32,7 +32,7 @@ const PROJECTS: {
       alt: "The freeform clock: brass rods soldered into an open frame holding the STM32, a red LED and a DC jack",
     },
   },
-  { title: "Watch", href: "/watch/", image: null, draft: true },
+  { title: "Time", href: "/time/", image: null, draft: true },
 ];
 
 // Wide, narrow / narrow, wide on a 5-column grid, so the four tiles form a mosaic.

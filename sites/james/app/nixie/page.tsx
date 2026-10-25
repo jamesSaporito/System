@@ -1,15 +1,41 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
 import { MediaImage } from "@/components/media-image";
+import { A, Hero, Intro, Sections, type Section, type Spec } from "@/components/project-page";
 import { mediaUrl } from "@/lib/media";
 
 export const metadata: Metadata = { title: "Nixie" };
 
-const REPO_URL = "https://github.com/jamesSaporito/NixieClock";
-
 const HERO = {
   src: mediaUrl("nixie/front.webp"),
   alt: "The nixie clock from the front, its four orange tubes reading 03:00",
+};
+
+const INTRO = (
+  <>
+    <p>
+      This is a nixie tube clock that tells basic time. Two push buttons are used to set the time,
+      one for the hour and the other for the minute, and a mechanical switch turns the tubes on and
+      off.
+    </p>
+    <p>
+      More info about <A href="https://en.wikipedia.org/wiki/Nixie_tube">Nixie Tubes</A>.
+    </p>
+  </>
+);
+
+const SPECS: Spec[] = [
+  { label: "Display", value: "Four IN-12A nixie tubes" },
+  { label: "Tube voltage", value: "~170 V DC from an NCH8200HV module" },
+  { label: "Board voltage", value: "9V DC" },
+  { label: "Tube drivers", value: "Four K155ID1 ICs, one per tube" },
+  { label: "Microcontroller", value: "STM32L010K4T6" },
+  { label: "Timekeeping", value: "RTC with a 32.768 kHz crystal" },
+  { label: "Controls", value: "Hour and minute buttons, power switch" },
+];
+
+const REPO = {
+  href: "https://github.com/jamesSaporito/NixieClock",
+  label: "Schematics, 3D files and firmware on GitHub",
 };
 
 const GALLERY = [
@@ -23,41 +49,8 @@ const GALLERY = [
   },
 ];
 
-const SPECS = [
-  { label: "Display", value: "Four IN-12A nixie tubes" },
-  { label: "Tube voltage", value: "~170 V DC from an NCH8200HV module" },
-  { label: "Board voltage", value: "9V DC" },
-  { label: "Tube drivers", value: "Four K155ID1 ICs, one per tube" },
-  { label: "Microcontroller", value: "STM32L010K4T6" },
-  { label: "Timekeeping", value: "RTC with a 32.768 kHz crystal" },
-  { label: "Controls", value: "Hour and minute buttons, power switch" },
-];
-
-/** Inline link styled with the page's nixie-orange accent. */
-function A({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className="text-amber-700 underline decoration-amber-700/30 underline-offset-2 transition-colors hover:decoration-amber-700 dark:text-amber-400 dark:decoration-amber-400/30 dark:hover:decoration-amber-400"
-    >
-      {children}
-    </a>
-  );
-}
-
-type Section = {
-  id: string;
-  title: string;
-  content: ReactNode;
-  /** Optional photo shown under the section's text. */
-  image?: { src: string; alt: string };
-};
-
 const SECTIONS: Section[] = [
   {
-    id: "core-components",
     title: "Core Components",
     content: (
       <>
@@ -85,7 +78,6 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "pcb",
     title: "PCB",
     content: (
       <>
@@ -106,11 +98,11 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "enclosure",
     title: "Enclosure",
     image: {
       src: mediaUrl("nixie/side.webp"),
       alt: "Side profile of the enclosure, a low wedge that rises to the angled tube face",
+      aspect: "aspect-[3/2]",
     },
     content: (
       <>
@@ -133,7 +125,6 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "firmware",
     title: "Firmware",
     content: (
       <>
@@ -167,7 +158,6 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "design-flaws",
     title: "Design Flaws",
     content: (
       <ul className="list-disc space-y-3 pl-5 marker:text-amber-600 dark:marker:text-amber-400">
@@ -191,45 +181,11 @@ export default function NixiePage() {
     <>
       <h1 className="sr-only">Nixie Tube Clock</h1>
 
-      <MediaImage
-        {...HERO}
-        eager
-        aspect="aspect-[3/2]"
-        sizes="(min-width: 1280px) 1184px, 100vw"
-        className="mt-6 motion-safe:animate-fade-in"
-      />
+      <Hero {...HERO} aspect="aspect-[3/2]" />
 
-      {/* Intro beside a spec sheet; stacked on phones. */}
-      <div className="mt-12 grid gap-10 lg:grid-cols-12 lg:gap-12">
-        <div className="space-y-4 text-lg leading-relaxed lg:col-span-7">
-          <p>
-            This is a nixie tube clock that tells basic time. Two push buttons are used to set the
-            time, one for the hour and the other for the minute, and a mechanical switch turns the
-            tubes on and off.
-          </p>
-          <p>
-            More info about <A href="https://en.wikipedia.org/wiki/Nixie_tube">Nixie Tubes</A>.
-          </p>
-        </div>
-        <div className="lg:col-span-5">
-          <dl className="divide-y divide-neutral-200 rounded-lg border border-neutral-200 text-sm dark:divide-neutral-800 dark:border-neutral-800">
-            {SPECS.map(({ label, value }) => (
-              <div key={label} className="grid grid-cols-5 gap-4 px-5 py-3">
-                <dt className="col-span-2 text-neutral-500 dark:text-neutral-400">{label}</dt>
-                <dd className="col-span-3">{value}</dd>
-              </div>
-            ))}
-          </dl>
-          <a
-            href={REPO_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-4 flex items-center justify-center gap-2 rounded-lg border border-neutral-200 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
-          >
-            Schematics, 3D files and firmware on GitHub <span aria-hidden="true">→</span>
-          </a>
-        </div>
-      </div>
+      <Intro specs={SPECS} repo={REPO}>
+        {INTRO}
+      </Intro>
 
       <div className="mt-16 grid gap-6 sm:grid-cols-2">
         {GALLERY.map((image) => (
@@ -242,48 +198,7 @@ export default function NixiePage() {
         ))}
       </div>
 
-      {/* Write-up with a table of contents that stays in view on large screens. */}
-      <div className="mt-20 grid gap-12 lg:grid-cols-12">
-        <nav aria-label="Sections" className="hidden lg:col-span-3 lg:block">
-          <ol className="sticky top-8 space-y-1 text-sm">
-            {SECTIONS.map(({ id, title }, index) => (
-              <li key={id}>
-                <a
-                  href={`#${id}`}
-                  className="flex gap-3 rounded-md px-3 py-2 text-neutral-600 transition-colors hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-900 dark:hover:text-neutral-100"
-                >
-                  <span className="text-amber-700 tabular-nums dark:text-amber-400">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  {title}
-                </a>
-              </li>
-            ))}
-          </ol>
-        </nav>
-
-        <div className="space-y-16 lg:col-span-9">
-          {SECTIONS.map(({ id, title, content, image }, index) => (
-            <section key={id} id={id} className="max-w-3xl scroll-mt-8">
-              <p className="text-sm font-medium tracking-widest text-amber-700 tabular-nums dark:text-amber-400">
-                {String(index + 1).padStart(2, "0")}
-              </p>
-              <h2 className="mt-1 text-2xl font-semibold tracking-tight">{title}</h2>
-              <div className="mt-4 space-y-4 leading-relaxed text-neutral-600 dark:text-neutral-400 [&_code]:rounded [&_code]:bg-neutral-100 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:text-[0.9em] dark:[&_code]:bg-neutral-800">
-                {content}
-              </div>
-              {image ? (
-                <MediaImage
-                  {...image}
-                  aspect="aspect-[3/2]"
-                  sizes="(min-width: 1024px) 768px, 100vw"
-                  className="mt-8"
-                />
-              ) : null}
-            </section>
-          ))}
-        </div>
-      </div>
+      <Sections sections={SECTIONS} />
     </>
   );
 }
