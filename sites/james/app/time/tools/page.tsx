@@ -111,6 +111,10 @@ const SECTIONS: Section[] = [
   },
   {
     title: "Jacot",
+    image: {
+      src: mediaUrl("time/tools/jacot-lathe.webp"),
+      alt: "The Jacot tool in its red-lined wooden case, with its runners and burnisher laid out beside the bed",
+    },
     content: (
       <>
         <p>
