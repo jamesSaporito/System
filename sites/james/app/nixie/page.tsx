@@ -13,12 +13,11 @@ const HERO = {
 const INTRO = (
   <>
     <p>
-      This is a nixie tube clock that tells basic time. Two push buttons are used to set the time,
-      one for the hour and the other for the minute, and a mechanical switch turns the tubes on and
-      off.
+      This is a nixie tube clock that tells basic time. Two push buttons set the time, one for the
+      hour and one for the minute, and a mechanical switch turns the tubes on and off.
     </p>
     <p>
-      More info about <A href="https://en.wikipedia.org/wiki/Nixie_tube">Nixie Tubes</A>.
+      More info about <A href="https://en.wikipedia.org/wiki/Nixie_tube">nixie tubes</A>.
     </p>
   </>
 );
@@ -51,28 +50,27 @@ const GALLERY = [
 
 const SECTIONS: Section[] = [
   {
-    title: "Core Components",
+    title: "Components",
     content: (
       <>
         <p>
-          Four IN-12A nixie tubes are used, which require ~170V DC to illuminate. The{" "}
-          <A href="https://omnixie.com/products/nch8200hv-nixie-hv-power-module">NCH8200HV</A> is
-          used to generate this voltage. The mechanical switch cuts power from this module, which
-          allows the tubes to be turned off.
+          It uses four IN-12A nixie tubes, which need ~170V DC to light up. The{" "}
+          <A href="https://omnixie.com/products/nch8200hv-nixie-hv-power-module">NCH8200HV</A>{" "}
+          generates this voltage, and the mechanical switch cuts power to the module, which is how
+          the tubes are turned off.
         </p>
         <p>
-          The nixie tubes are driven from four{" "}
-          <A href="https://tubehobby.com/datasheets/k155id1.pdf">K155ID1</A> ICs, one IC per tube.
-          These are very obsolete, but were made specifically to drive nixie tubes.
+          The tubes are driven by four{" "}
+          <A href="https://tubehobby.com/datasheets/k155id1.pdf">K155ID1</A> ICs, one per tube.
+          They&apos;re very obsolete, but they were made specifically to drive nixie tubes.
         </p>
         <p>
-          The microcontroller used for this project is the{" "}
+          The microcontroller is the{" "}
           <A href="https://www.st.com/en/microcontrollers-microprocessors/stm32l010k4.html">
             STM32L010K4T6
           </A>
-          , an Arm Cortex-M0+ MCU. The RTC is used along with an external 32.768 kHz crystal to keep
-          accurate time. Based on the one I&apos;ve built, it consistently gains around two seconds
-          per day.
+          , an Arm Cortex-M0+ MCU. Its RTC uses an external 32.768 kHz crystal to keep accurate
+          time. The one I built consistently gains around two seconds a day.
         </p>
       </>
     ),
@@ -81,18 +79,15 @@ const SECTIONS: Section[] = [
     title: "PCB",
     content: (
       <>
-        <p>The PCBs were designed using KiCad in two separate projects.</p>
+        <p>The PCBs were designed in KiCad, as two separate projects.</p>
         <p>
-          There are two PCBs, the main board and the tube board. The main board is where all the
-          main components live (MCU, ICs, capacitors, etc.). The tube board is specifically for the
-          tube sockets to be soldered to, and then the tubes to plug into those. The main board and
-          tube board plug into each other via header pins. The male header pins are soldered to one
-          board, and the female to the other. This is how the current flows from the main board to
-          the tube board. It also allows the PCBs to be disassembled if necessary.
-        </p>
-        <p>
-          The tubes should not be directly soldered to the PCB. Instead, solder tube sockets to the
-          PCB, then plug the tubes into those. This will allow replacement of a tube if one breaks.
+          There are two boards: the main board and the tube board. The main board holds all the main
+          components (MCU, ICs, capacitors, etc.), while the tube board is only for the tube
+          sockets, which the tubes plug into. The two boards connect through header pins, male on
+          one and female on the other. That&apos;s how current flows from the main board to the tube
+          board, and it also means the boards can be taken apart if needed. The tubes should not be
+          soldered directly to the PCB. Tube sockets are used instead and the tubes are plugged into
+          those, so a tube can be replaced if one breaks.
         </p>
       </>
     ),
@@ -107,19 +102,19 @@ const SECTIONS: Section[] = [
     content: (
       <>
         <p>
-          The enclosure is 3D printed, and the parts require threaded brass inserts for the screws
-          to secure everything. There are currently two versions of the enclosure.
+          The enclosure is 3D printed, with threaded brass inserts for the screws that hold
+          everything together. There are currently two versions.
         </p>
         <p>
-          <strong className="font-medium text-neutral-900 dark:text-neutral-100">V1</strong>{" "}
-          Original design. PCB spacers are used for additional support between the boards to
-          minimize stress on the header pins that connect the tube board to the main board.
+          <strong className="font-medium text-neutral-900 dark:text-neutral-100">V1</strong> The
+          original design. PCB spacers add support between the boards, taking stress off the header
+          pins that connect the tube board to the main board.
         </p>
         <p>
           <strong className="font-medium text-neutral-900 dark:text-neutral-100">V2</strong>{" "}
-          Inspired from Dieter Rams&apos;s design of the Braun DN40. Four screws (top two alone are
-          enough) can be used to secure the tube board to the PCB mount. Easy to tap/screw directly
-          into the plastic.
+          Inspired by Dieter Rams&apos;s design for the Braun DN40. Four screws secure the tube
+          board to the PCB mount (the top two alone are enough), and they tap straight into the
+          plastic.
         </p>
       </>
     ),
@@ -129,49 +124,38 @@ const SECTIONS: Section[] = [
     content: (
       <>
         <p>
-          The firmware is a standard STM32 project set up using CLion and its integration with
-          STM32CubeMX.
+          The firmware is a standard STM32 project.
         </p>
         <p>
-          The only important thing to keep some form of is the <code>cycle()</code> function. All
-          this does is cycle through each number on every tube, which is supposed to prevent cathode
-          poisoning. Unsure how effective this is at the current frequency and duration.
+          Every ten minutes the tubes quickly cycle through each number. This is meant to prevent <A href="https://en.wikipedia.org/wiki/Hot_cathode#Failure_modes">cathode poisoning</A>.
+          I&apos;m not sure how effective it is at the current frequency and duration.
         </p>
         <p>
-          In order to avoid additional hardware, a{" "}
+          To avoid extra hardware, the main board has a{" "}
           <A href="https://www.tag-connect.com/product/tc2030-idc-6-pin-tag-connect-plug-of-nails-spring-pin-cable-with-legs">
             Tag-Connect
           </A>{" "}
-          footprint is used on the main board. This is used with an{" "}
-          <A href="https://www.st.com/en/development-tools/st-link-v2.html">ST-LINK</A> device
-          (clones should work just fine) to program the MCU.
-        </p>
-        <p>
-          Unfortunately, using <A href="https://github.com/stlink-org/stlink">stlink</A>{" "}
-          doesn&apos;t seem to work with{" "}
-          <A href="https://github.com/stlink-org/stlink/issues/1203">several STM32L0xxx MCUs</A>. To
-          get around this, the project can be opened up in STM32CubeIDE and flashed using the built
-          in debugging functionality. Not ideal, but it works. Update: It looks like this issue was
-          fixed, I have not had time to test it out.
+          footprint, which is used with an{" "}
+          <A href="https://www.st.com/en/development-tools/st-link-v2.html">ST-LINK</A> (clones
+          should work just fine) to program the MCU.
         </p>
       </>
     ),
   },
   {
-    title: "Design Flaws",
+    title: "Improvements",
     content: (
-      <ul className="list-disc space-y-3 pl-5 marker:text-amber-600 dark:marker:text-amber-400">
-        <li>
-          Due to the PCB using a Tag-Connect footprint for programming, the enclosure design pretty
-          much requires the MCU to be programmed prior to assembling everything. If there is a
-          desire to upload different firmware, then it will mostly have to be taken apart.
-        </li>
-        <li>
-          The DC jack that was used for this design requires to be mounted prior to soldering the
-          wires to it. This restricts the enclosure from being completely removed without cutting
-          the wires to this jack.
-        </li>
-      </ul>
+      <>
+        <p>
+          Because the PCB is programmed through a Tag-Connect footprint, the enclosure design pretty
+          much requires the MCU to be programmed before everything is assembled. Uploading different
+          firmware later means mostly taking it apart.
+        </p>
+        <p>
+          The DC jack used in this design has to be mounted before the wires are soldered to it, so
+          the enclosure can&apos;t be completely removed without cutting those wires.
+        </p>
+      </>
     ),
   },
 ];

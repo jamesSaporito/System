@@ -19,6 +19,12 @@ const INTRO = (
       It uses an STM32 and one red LED that tells the time in morse code.
     </p>
     <p>
+      Everything is soldered together using K &amp; S Precision Metals brass rods. A few different
+      sizes were used. The smallest size used was 0.51mm, which was for soldering directly to the
+      pins of the STM32, as well as other small components. 0.81mm and 1.5mm were used for power and
+      ground rails, as well as a rigid structure.
+    </p>
+    <p>
       Even though it works as intended, it&apos;s not at all reliable as a clock. Due to the time
       consumption of soldering everything in awkward positions, I skipped adding an external
       32.768kHz crystal that would ensure the RTC is accurate. During testing, I observed the
@@ -29,16 +35,31 @@ const INTRO = (
       specifically the works of <A href="https://eirikbrandal.com/">Eirik Brandal</A> and{" "}
       <A href="https://bhoite.com/">Mohit Bhoite</A>.
     </p>
-    <p>This is the first one I&apos;ve made, so it&apos;s a bit rough.</p>
   </>
 );
 
 const SPECS: Spec[] = [
-  { label: "Microcontroller", value: "STM32" },
-  { label: "Display", value: "One red LED, morse code" },
-  { label: "Regulator", value: "3.3V voltage regulator" },
-  { label: "Power", value: "5V DC power supply (center positive)" },
-  { label: "Structure", value: "K & S Precision Metals brass rods" },
+  {
+    label: "Microcontroller",
+    value: <A href="https://www.st.com/resource/en/datasheet/stm32l010f4.pdf">STM32</A>,
+  },
+  { label: "Display", value: "One red LED" },
+  {
+    label: "Regulator",
+    value: <A href="https://www.ti.com/lit/ds/symlink/tps7a05.pdf">TPS7A05</A>,
+  },
+  { label: "Power", value: "5V DC" },
+  {
+    label: "Structure",
+    value: (
+      <>
+        K &amp; S Precision Metals brass rods:{" "}
+        <A href="https://ksmetals.com/products/brrmet-h">0.51mm</A>,{" "}
+        <A href="https://ksmetals.com/products/brr-1-32">0.81mm</A> and{" "}
+        <A href="https://ksmetals.com/products/br225mm-1h">1.5mm</A>
+      </>
+    ),
+  },
   { label: "Programming", value: "SWD" },
 ];
 
@@ -49,7 +70,7 @@ const REPO = {
 
 const SECTIONS: Section[] = [
   {
-    title: "Setting Time",
+    title: "Setting",
     content: (
       <p>
         The only method to set the time is to plug the clock in at midnight. When powered on, the
@@ -72,34 +93,6 @@ const SECTIONS: Section[] = [
         it&apos;s quite delicate and very easy to accidentally bend a rod out of place. Best not to
         do this often.
       </p>
-    ),
-  },
-  {
-    title: "Core Components",
-    content: (
-      <>
-        <ul className="list-disc space-y-2 pl-5 marker:text-amber-600 dark:marker:text-amber-400">
-          <li>
-            <A href="https://www.st.com/resource/en/datasheet/stm32l010f4.pdf">STM32</A>
-          </li>
-          <li>
-            <A href="https://www.ti.com/lit/ds/symlink/tps7a05.pdf">3.3V voltage regulator</A>
-          </li>
-          <li>DC Jack</li>
-          <li>All necessary decoupling capacitors/etc that would be used in a practical PCB.</li>
-          <li>Red LED</li>
-          <li>5V DC power supply (center positive)</li>
-        </ul>
-        <p>
-          Everything is soldered together using K &amp; S Precision Metals brass rods. A few
-          different sizes were used. The smallest size used was{" "}
-          <A href="https://ksmetals.com/products/brrmet-h">0.51mm</A>, which was for soldering
-          directly to the pins of the STM32, as well as other small components.{" "}
-          <A href="https://ksmetals.com/products/brr-1-32">0.81mm</A> and{" "}
-          <A href="https://ksmetals.com/products/br225mm-1h">1.5mm</A> were used for power and
-          ground rails, as well as a rigid structure.
-        </p>
-      </>
     ),
   },
 ];

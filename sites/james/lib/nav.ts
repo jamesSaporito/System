@@ -26,6 +26,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/motorcycle/", label: "Motorcycle" },
   { href: "/nixie/", label: "Nixie" },
   { href: "/freeform/", label: "Freeform" },
+  { href: "/art/", label: "Art" },
   // Add sub-projects as { href: "/time/<slug>/", label: "…" }; mark individual pages
   // `draft: true` (and name the file page.draft.tsx). Watches come from lib/watches.ts, grouped by
   // maker; a group with no published watches is hidden automatically.
@@ -33,7 +34,7 @@ const NAV_ITEMS: NavItem[] = [
     href: "/time/",
     label: "Time",
     children: [
-      { href: "/time/", label: "Overview" },
+      { href: "/time/", label: "Overview", draft: true },
       { href: "/time/tools/", label: "Tools" },
       ...watchGroups(),
     ],

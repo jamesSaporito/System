@@ -14,14 +14,14 @@ const PROJECTS: {
   {
     title: "Motorcycle",
     href: "/motorcycle/",
-    image: { src: mediaUrl("motorcycle/complete.webp"), alt: "The finished 1971 Honda CL350" },
+    image: { src: mediaUrl("motorcycle/complete.webp"), alt: "1971 Honda CL350" },
   },
   {
     title: "Nixie",
     href: "/nixie/",
     image: {
       src: mediaUrl("nixie/front.webp"),
-      alt: "The nixie clock from the front, its four orange tubes reading 03:00",
+      alt: "A nixie clock from the front, its four orange tubes reading 03:00",
     },
   },
   {
@@ -29,13 +29,37 @@ const PROJECTS: {
     href: "/freeform/",
     image: {
       src: mediaUrl("freeform/sculpture.webp"),
-      alt: "The freeform clock: brass rods soldered into an open frame holding the STM32, a red LED and a DC jack",
+      alt: "Brass rods soldered into an open frame holding an STM32, a red LED and a DC jack",
     },
   },
-  { title: "Time", href: "/time/", image: null, draft: true },
+  {
+    title: "Tools",
+    href: "/time/tools/",
+    image: {
+      src: mediaUrl("time/tools/jacot-lathe.webp"),
+      alt: "A Jacot lathe in its red-lined wooden case",
+    },
+  },
+  {
+    title: "Art",
+    href: "/art/",
+    image: {
+      src: mediaUrl("art/house.webp"),
+      alt: "A painting of a thatched stone cottage on a quiet lane",
+    },
+  },
+  {
+    title: "Bold and Brash",
+    href: "/art/#bold-and-brash",
+    image: {
+      src: mediaUrl("art/bold-and-brash.webp"),
+      alt: "A recreation of Squidward's painting Bold and Brash",
+    },
+  },
 ];
 
-// Wide, narrow / narrow, wide on a 5-column grid, so the four tiles form a mosaic.
+// Wide, narrow / narrow, wide on a 5-column grid, repeating every four tiles, so each pair of
+// tiles fills a row of the mosaic.
 const SPANS = ["md:col-span-3", "md:col-span-2", "md:col-span-2", "md:col-span-3"];
 const TILE = "relative aspect-[4/3] overflow-hidden rounded-lg md:aspect-auto md:h-80 lg:h-[26rem]";
 
