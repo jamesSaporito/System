@@ -116,7 +116,7 @@ export function Hero({ src, alt, aspect }: { src: string | null; alt: string; as
       eager
       aspect={aspect}
       sizes="(min-width: 1280px) 1184px, 100vw"
-      className="mt-6 motion-safe:animate-fade-in"
+      className="mt-6"
     />
   );
 }

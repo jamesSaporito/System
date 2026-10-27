@@ -273,20 +273,16 @@ function DropdownTab({ item, pathname }: { item: NavItem; pathname: string }) {
   );
 }
 
-const DRAWER_LINK = "relative block py-3 font-light transition-colors";
+const DRAWER_ROW = "relative block w-full py-3 text-left font-light transition-colors";
+const DRAWER_IDLE =
+  "text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100";
+// Indent per level: top-level tabs, dropdown items, then items inside a nested group.
+const DRAWER_INDENT = ["pl-4 text-lg", "pl-8 text-base", "pl-12 text-base"];
+
+type DrawerProps = { item: NavItem; pathname: string; depth: number; onNavigate: () => void };
 
 /** A link in the mobile drawer; the current page gets the same left hairline as the dropdown. */
-function DrawerLink({
-  item,
-  pathname,
-  nested = false,
-  onNavigate,
-}: {
-  item: NavItem;
-  pathname: string;
-  nested?: boolean;
-  onNavigate: () => void;
-}) {
+function DrawerLink({ item, pathname, depth, onNavigate }: DrawerProps) {
   const active = normalize(item.href) === normalize(pathname);
   return (
     <li>
@@ -294,12 +290,12 @@ function DrawerLink({
         href={item.href}
         aria-current={active ? "page" : undefined}
         onClick={onNavigate}
-        className={`${DRAWER_LINK} before:absolute before:inset-y-2.5 before:left-0 before:w-px ${
-          nested ? "pl-8 text-base" : "pl-4 text-lg"
+        className={`${DRAWER_ROW} before:absolute before:inset-y-2.5 before:left-0 before:w-px ${
+          DRAWER_INDENT[depth]
         } ${
           active
             ? "text-neutral-900 before:bg-neutral-900 dark:text-neutral-100 dark:before:bg-neutral-100"
-            : "text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
+            : DRAWER_IDLE
         }`}
       >
         {item.label}
@@ -309,12 +305,64 @@ function DrawerLink({
 }
 
 /**
- * Below `md`, a menu button that slides in a panel listing every page at once: dropdown tabs
- * become headed sections and their groups become sub-headings, so nothing needs expanding.
+ * A dropdown in the mobile drawer: a row that expands to its pages when tapped. It starts open
+ * when the current page is inside it. Nested groups work the same way, one level further in.
+ */
+function DrawerGroup({ item, pathname, depth, onNavigate }: DrawerProps) {
+  const active = isActive(item.href, pathname);
+  const [expanded, setExpanded] = useState(active);
+  const listId = useId();
+
+  return (
+    <li>
+      <button
+        type="button"
+        aria-expanded={expanded}
+        aria-controls={listId}
+        onClick={() => setExpanded(!expanded)}
+        className={`flex items-center justify-between gap-4 pr-2 ${DRAWER_ROW} ${DRAWER_INDENT[depth]} ${
+          active ? "text-neutral-900 dark:text-neutral-100" : DRAWER_IDLE
+        }`}
+      >
+        {item.label}
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 16 16"
+          className={`size-3 transition-transform ${expanded ? "rotate-180" : ""}`}
+        >
+          <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      </button>
+      {expanded ? (
+        <ul id={listId}>
+          {item.children?.map((child) => (
+            <DrawerItem
+              key={child.href}
+              item={child}
+              pathname={pathname}
+              depth={depth + 1}
+              onNavigate={onNavigate}
+            />
+          ))}
+        </ul>
+      ) : null}
+    </li>
+  );
+}
+
+function DrawerItem(props: DrawerProps) {
+  return props.item.children ? <DrawerGroup {...props} /> : <DrawerLink {...props} />;
+}
+
+/**
+ * Below `md`, a menu button that slides in a panel listing the tabs; dropdowns (and the groups
+ * inside them) expand in place when tapped.
  */
 function MobileMenu({ items, pathname }: { items: NavItem[]; pathname: string }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [open, setOpen] = useState(false);
+  // Bumped on every open: the nav is keyed on it, so expanded dropdowns reset each time.
+  const [opens, setOpens] = useState(0);
   const dialogId = useId();
   const close = () => dialogRef.current?.close();
 
@@ -329,6 +377,7 @@ function MobileMenu({ items, pathname }: { items: NavItem[]; pathname: string })
         onClick={() => {
           dialogRef.current?.showModal();
           setOpen(true);
+          setOpens(opens + 1);
         }}
         className="absolute top-1/2 right-3 -translate-y-1/2 rounded-md p-2 text-neutral-600 transition-colors hover:text-neutral-900 focus-visible:outline-2 focus-visible:outline-neutral-400 md:hidden dark:text-neutral-400 dark:hover:text-neutral-100"
       >
@@ -371,53 +420,17 @@ function MobileMenu({ items, pathname }: { items: NavItem[]; pathname: string })
                 />
               </svg>
             </button>
-            <nav aria-label="Main" className="mt-2">
+            <nav key={opens} aria-label="Main" className="mt-2">
               <ul>
-                {items.map((item) =>
-                  item.children ? (
-                    <li key={item.href} className="mt-6">
-                      <p className="pb-1 pl-4 text-xs tracking-widest text-neutral-500 uppercase dark:text-neutral-400">
-                        {item.label}
-                      </p>
-                      <ul>
-                        {item.children.map((child) =>
-                          child.children ? (
-                            <li key={child.href}>
-                              <p className="pt-3 pl-4 text-sm font-light text-neutral-500 dark:text-neutral-400">
-                                {child.label}
-                              </p>
-                              <ul>
-                                {child.children.map((grandchild) => (
-                                  <DrawerLink
-                                    key={grandchild.href}
-                                    item={grandchild}
-                                    pathname={pathname}
-                                    nested
-                                    onNavigate={close}
-                                  />
-                                ))}
-                              </ul>
-                            </li>
-                          ) : (
-                            <DrawerLink
-                              key={child.href}
-                              item={child}
-                              pathname={pathname}
-                              onNavigate={close}
-                            />
-                          ),
-                        )}
-                      </ul>
-                    </li>
-                  ) : (
-                    <DrawerLink
-                      key={item.href}
-                      item={item}
-                      pathname={pathname}
-                      onNavigate={close}
-                    />
-                  ),
-                )}
+                {items.map((item) => (
+                  <DrawerItem
+                    key={item.href}
+                    item={item}
+                    pathname={pathname}
+                    depth={0}
+                    onNavigate={close}
+                  />
+                ))}
               </ul>
             </nav>
           </div>
