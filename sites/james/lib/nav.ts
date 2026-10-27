@@ -21,24 +21,39 @@ function watchGroups(): NavItem[] {
 }
 
 // Read on the server (layout.tsx), so drafts are filtered out before anything reaches the browser.
+// A tab or group with `children` is a dropdown; its `href` only identifies it (it isn't linked),
+// and it's highlighted when the current page is anywhere inside it.
 const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Home" },
-  { href: "/motorcycle/", label: "Motorcycle" },
-  { href: "/nixie/", label: "Nixie" },
-  { href: "/freeform/", label: "Freeform" },
-  { href: "/art/", label: "Art" },
-  // Add sub-projects as { href: "/time/<slug>/", label: "…" }; mark individual pages
-  // `draft: true` (and name the file page.draft.tsx). Watches come from lib/watches.ts, grouped by
-  // maker; a group with no published watches is hidden automatically.
   {
-    href: "/time/",
-    label: "Time",
+    href: "/electronics/",
+    label: "Electronics",
     children: [
-      { href: "/time/", label: "Overview", draft: true },
-      { href: "/time/tools/", label: "Tools" },
-      ...watchGroups(),
+      { href: "/nixie/", label: "Nixie" },
+      { href: "/freeform/", label: "Freeform" },
     ],
   },
+  {
+    href: "/mechanical/",
+    label: "Mechanical",
+    children: [
+      { href: "/motorcycle/", label: "Motorcycle" },
+      // Add sub-projects as { href: "/time/<slug>/", label: "…" }; mark individual pages
+      // `draft: true` (and name the file page.draft.tsx). Watches come from lib/watches.ts,
+      // grouped by maker; a group with no published watches is hidden automatically.
+      {
+        href: "/time/",
+        label: "Time",
+        children: [
+          { href: "/time/", label: "Overview", draft: true },
+          { href: "/time/tools/", label: "Tools" },
+          ...watchGroups(),
+        ],
+      },
+    ],
+  },
+  { href: "/art/", label: "Art" },
+  { href: "/leather/", label: "Leather", draft: true },
 ];
 
 /**

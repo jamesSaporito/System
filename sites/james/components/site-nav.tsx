@@ -29,6 +29,13 @@ function isActive(href: string, pathname: string): boolean {
   return target === "/" ? current === "/" : current === target || current.startsWith(`${target}/`);
 }
 
+/** A dropdown is active when the current page is anywhere inside it; a link, as `isActive`. */
+function isActiveItem(item: NavItem, pathname: string): boolean {
+  return item.children
+    ? item.children.some((child) => isActiveItem(child, pathname))
+    : isActive(item.href, pathname);
+}
+
 // The active tab is underlined; the line is inset by the tab's padding so it spans just the label.
 // Every tab keeps the same weight, so switching tabs doesn't shift the row.
 const TAB =
@@ -39,19 +46,13 @@ const TAB_IDLE =
   "text-neutral-600 hover:text-neutral-900 hover:after:bg-neutral-300 dark:text-neutral-400 dark:hover:text-neutral-100 dark:hover:after:bg-neutral-700";
 
 const MENU_ROW = "relative block w-full px-5 py-2.5 text-left font-light transition-colors";
+// Indent per level of inline expansion inside a dropdown.
+const MENU_INDENT = ["", "pl-9", "pl-14"];
 const MENU_IDLE =
   "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800/60 dark:hover:text-neutral-100";
 
-/** A dropdown row linking to a page. `nested` indents it under its group. */
-function MenuLink({
-  item,
-  pathname,
-  nested = false,
-}: {
-  item: NavItem;
-  pathname: string;
-  nested?: boolean;
-}) {
+/** A dropdown row linking to a page, indented `depth` levels under the groups it's in. */
+function MenuLink({ item, pathname, depth }: { item: NavItem; pathname: string; depth: number }) {
   // Exact match: each row is one page, and "Overview" (/time/) shouldn't light up on its children.
   const active = normalize(item.href) === normalize(pathname);
   return (
@@ -61,7 +62,7 @@ function MenuLink({
         aria-current={active ? "page" : undefined}
         // Square rows; the current page gets a hairline at its left edge, echoing the tabs'
         // underline.
-        className={`${MENU_ROW} before:absolute before:inset-y-2 before:left-0 before:w-px ${nested ? "pl-9" : ""} ${
+        className={`${MENU_ROW} before:absolute before:inset-y-2 before:left-0 before:w-px ${MENU_INDENT[depth]} ${
           active
             ? "text-neutral-900 before:bg-neutral-900 dark:text-neutral-100 dark:before:bg-neutral-100"
             : MENU_IDLE
@@ -115,18 +116,10 @@ function useClickPointer() {
 /**
  * A dropdown row with its own sub-pages. With hover menus, hovering opens them in a flyout beside
  * the menu; tapping (or the keyboard) expands them inline, which is also how the current page's
- * group starts.
+ * group starts. Groups can hold groups of their own, which work the same way one level further in.
  */
-function MenuGroup({
-  item,
-  pathname,
-  hoverMenus,
-}: {
-  item: NavItem;
-  pathname: string;
-  hoverMenus: boolean;
-}) {
-  const active = isActive(item.href, pathname);
+function MenuGroup({ item, pathname, hoverMenus, depth }: MenuItemProps) {
+  const active = isActiveItem(item, pathname);
   const [expanded, setExpanded] = useState(active);
   const [hovered, setHovered] = useState(false);
   const click = useClickPointer();
@@ -147,7 +140,7 @@ function MenuGroup({
         onClick={() => {
           if (!(click.takeMouse() && hoverMenus)) setExpanded(!expanded);
         }}
-        className={`flex items-center justify-between gap-4 ${MENU_ROW} ${
+        className={`flex items-center justify-between gap-4 ${MENU_ROW} ${MENU_INDENT[depth]} ${
           active || flyout ? "text-neutral-900 dark:text-neutral-100" : MENU_IDLE
         } ${flyout ? "bg-neutral-50 dark:bg-neutral-800/60" : ""}`}
       >
@@ -163,7 +156,13 @@ function MenuGroup({
       {expanded ? (
         <ul id={listId}>
           {item.children?.map((child) => (
-            <MenuLink key={child.href} item={child} pathname={pathname} nested />
+            <MenuItem
+              key={child.href}
+              item={child}
+              pathname={pathname}
+              hoverMenus={hoverMenus}
+              depth={depth + 1}
+            />
           ))}
         </ul>
       ) : null}
@@ -171,11 +170,27 @@ function MenuGroup({
         // Beside the row, its first item level with the group (offset by the border and padding).
         <ul id={listId} className={`absolute top-[-9px] left-full z-10 min-w-40 ${SUBMENU}`}>
           {item.children?.map((child) => (
-            <MenuLink key={child.href} item={child} pathname={pathname} />
+            <MenuItem
+              key={child.href}
+              item={child}
+              pathname={pathname}
+              hoverMenus={hoverMenus}
+              depth={0}
+            />
           ))}
         </ul>
       ) : null}
     </li>
+  );
+}
+
+type MenuItemProps = { item: NavItem; pathname: string; hoverMenus: boolean; depth: number };
+
+function MenuItem({ item, pathname, hoverMenus, depth }: MenuItemProps) {
+  return item.children ? (
+    <MenuGroup item={item} pathname={pathname} hoverMenus={hoverMenus} depth={depth} />
+  ) : (
+    <MenuLink item={item} pathname={pathname} depth={depth} />
   );
 }
 
@@ -186,7 +201,7 @@ function DropdownTab({ item, pathname }: { item: NavItem; pathname: string }) {
   const open = openOn === pathname;
   const ref = useRef<HTMLLIElement>(null);
   const menuId = useId();
-  const active = isActive(item.href, pathname);
+  const active = isActiveItem(item, pathname);
   const hoverMenus = useHoverMenus();
   const click = useClickPointer();
   // A short delay before a hover-opened menu closes, so a pointer that strays off it briefly
@@ -249,18 +264,15 @@ function DropdownTab({ item, pathname }: { item: NavItem; pathname: string }) {
         <div className="absolute top-full left-4 z-10 pt-3">
           <ul id={menuId} className={`min-w-48 ${SUBMENU}`}>
             {item.children?.length ? (
-              item.children.map((child) =>
-                child.children ? (
-                  <MenuGroup
-                    key={child.href}
-                    item={child}
-                    pathname={pathname}
-                    hoverMenus={hoverMenus}
-                  />
-                ) : (
-                  <MenuLink key={child.href} item={child} pathname={pathname} />
-                ),
-              )
+              item.children.map((child) => (
+                <MenuItem
+                  key={child.href}
+                  item={child}
+                  pathname={pathname}
+                  hoverMenus={hoverMenus}
+                  depth={0}
+                />
+              ))
             ) : (
               <li className="px-5 py-2.5 font-light text-neutral-400 dark:text-neutral-500">
                 No projects yet
@@ -276,8 +288,8 @@ function DropdownTab({ item, pathname }: { item: NavItem; pathname: string }) {
 const DRAWER_ROW = "relative block w-full py-3 text-left font-light transition-colors";
 const DRAWER_IDLE =
   "text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100";
-// Indent per level: top-level tabs, dropdown items, then items inside a nested group.
-const DRAWER_INDENT = ["pl-4 text-lg", "pl-8 text-base", "pl-12 text-base"];
+// Indent per level: top-level tabs, dropdown items, then items in groups nested inside them.
+const DRAWER_INDENT = ["pl-4 text-lg", "pl-8 text-base", "pl-12 text-base", "pl-16 text-base"];
 
 type DrawerProps = { item: NavItem; pathname: string; depth: number; onNavigate: () => void };
 
@@ -309,7 +321,7 @@ function DrawerLink({ item, pathname, depth, onNavigate }: DrawerProps) {
  * when the current page is inside it. Nested groups work the same way, one level further in.
  */
 function DrawerGroup({ item, pathname, depth, onNavigate }: DrawerProps) {
-  const active = isActive(item.href, pathname);
+  const active = isActiveItem(item, pathname);
   const [expanded, setExpanded] = useState(active);
   const listId = useId();
 

@@ -22,7 +22,14 @@ export function A({ href, children }: { href: string; children: ReactNode }) {
 /** A spec sheet row; the value can include links (e.g. to a part's datasheet). */
 export type Spec = { label: string; value: ReactNode };
 
-export type SectionImage = { src: string | null; alt: string; portrait?: boolean; aspect?: string };
+export type SectionImage = {
+  src: string | null;
+  alt: string;
+  portrait?: boolean;
+  aspect?: string;
+  /** Overrides how far a portrait photo is narrowed (default "max-w-md"), e.g. "max-w-xl". */
+  width?: string;
+};
 
 export type Section = {
   title: string;
@@ -77,7 +84,7 @@ function SectionBody({ content, image, images }: Omit<Section, "title" | "subsec
           sizes={
             image.portrait ? "(min-width: 640px) 448px, 100vw" : "(min-width: 1024px) 768px, 100vw"
           }
-          className={image.portrait ? "mt-8 max-w-md" : "mt-8"}
+          className={image.portrait ? `mt-8 ${image.width ?? "max-w-md"}` : "mt-8"}
         />
       ) : null}
       {rows.map((row, index) => (

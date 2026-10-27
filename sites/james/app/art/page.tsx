@@ -5,7 +5,8 @@ import { mediaUrl } from "@/lib/media";
 export const metadata: Metadata = { title: "Art" };
 
 // Page content lives here in code. Photos are in media/art/; each frame matches its piece's
-// proportions so the whole piece shows, and portrait pieces are narrowed.
+// proportions so the whole piece shows. Portrait pieces are narrowed less than on other pages, so
+// they come out close in size to the landscape ones.
 const SECTIONS: Section[] = [
   {
     title: "House",
@@ -22,6 +23,7 @@ const SECTIONS: Section[] = [
       alt: "Painting of a wooden house after a light snow, with yellow forsythia in the foreground and a stone path to the porch",
       aspect: "aspect-[2803/3360]",
       portrait: true,
+      width: "max-w-xl",
     },
   },
   {
@@ -41,12 +43,21 @@ const SECTIONS: Section[] = [
     },
   },
   {
-    title: "Bold and Brash",
+    title: "Woods",
     image: {
-      src: mediaUrl("art/bold-and-brash.webp"),
-      alt: "Recreation of Squidward's painting Bold and Brash: a green figure against a loose orange background",
-      aspect: "aspect-[2689/3374]",
+      src: mediaUrl("art/woods.webp"),
+      alt: "Painting of a dirt path winding through a spring wood, with bluebells under the trees and a fallen branch in sunlight",
+      aspect: "aspect-[2893/2853]",
+    },
+  },
+  {
+    title: "Park",
+    image: {
+      src: mediaUrl("art/park.webp"),
+      alt: "Painting of a still brown river between leafy trees under a clear blue sky, with grass and grey rocks in the foreground",
+      aspect: "aspect-[2868/3381]",
       portrait: true,
+      width: "max-w-xl",
     },
   },
 ];

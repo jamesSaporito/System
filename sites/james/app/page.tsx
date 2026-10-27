@@ -49,11 +49,11 @@ const PROJECTS: {
     },
   },
   {
-    title: "Bold and Brash",
-    href: "/art/#bold-and-brash",
+    title: "Woods",
+    href: "/art/#woods",
     image: {
-      src: mediaUrl("art/bold-and-brash.webp"),
-      alt: "A recreation of Squidward's painting Bold and Brash",
+      src: mediaUrl("art/woods.webp"),
+      alt: "A painting of a path through a bluebell wood",
     },
   },
 ];
