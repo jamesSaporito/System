@@ -194,29 +194,46 @@ function MenuItem({ item, pathname, hoverMenus, depth }: MenuItemProps) {
   );
 }
 
-/** A tab that opens a list of sub-projects. Closes on outside click, Escape, or navigation. */
-function DropdownTab({ item, pathname }: { item: NavItem; pathname: string }) {
-  // Remembers which page the menu was opened on, so navigating anywhere closes it.
-  const [openOn, setOpenOn] = useState<string | null>(null);
-  const open = openOn === pathname;
+/** The open dropdown (by its tab's href) and the page it was opened on, so navigating closes it. */
+type OpenMenu = { href: string; pathname: string } | null;
+
+type DropdownTabProps = {
+  item: NavItem;
+  pathname: string;
+  openMenu: OpenMenu;
+  setOpenMenu: (update: (current: OpenMenu) => OpenMenu) => void;
+};
+
+/**
+ * A tab that opens a list of sub-projects. Closes on outside click, Escape, or navigation. Only one
+ * is open at a time, so moving onto the next tab swaps menus at once.
+ */
+function DropdownTab({ item, pathname, openMenu, setOpenMenu }: DropdownTabProps) {
+  const open = openMenu?.href === item.href && openMenu.pathname === pathname;
   const ref = useRef<HTMLLIElement>(null);
   const menuId = useId();
   const active = isActiveItem(item, pathname);
   const hoverMenus = useHoverMenus();
   const click = useClickPointer();
-  // A short delay before a hover-opened menu closes, so a pointer that strays off it briefly
-  // doesn't lose it.
+  // A brief delay before a hover-opened menu closes, so a pointer that strays off it for a moment
+  // doesn't lose it. Kept short so leaving feels immediate.
   const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const setOpen = (next: boolean) =>
+    setOpenMenu((current) =>
+      next ? { href: item.href, pathname } : current?.href === item.href ? null : current,
+    );
 
   useEffect(() => () => clearTimeout(closeTimer.current), []);
 
   useEffect(() => {
     if (!open) return undefined;
+    const close = () => setOpenMenu((current) => (current?.href === item.href ? null : current));
     const onPointer = (event: PointerEvent) => {
-      if (!(event.target instanceof Node) || !ref.current?.contains(event.target)) setOpenOn(null);
+      if (!(event.target instanceof Node) || !ref.current?.contains(event.target)) close();
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpenOn(null);
+      if (event.key === "Escape") close();
     };
     document.addEventListener("pointerdown", onPointer);
     document.addEventListener("keydown", onKey);
@@ -224,7 +241,7 @@ function DropdownTab({ item, pathname }: { item: NavItem; pathname: string }) {
       document.removeEventListener("pointerdown", onPointer);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, item.href, setOpenMenu]);
 
   return (
     <li
@@ -233,11 +250,11 @@ function DropdownTab({ item, pathname }: { item: NavItem; pathname: string }) {
       onPointerEnter={(event) => {
         if (!hoverMenus || event.pointerType !== "mouse") return;
         clearTimeout(closeTimer.current);
-        setOpenOn(pathname);
+        setOpen(true);
       }}
       onPointerLeave={(event) => {
         if (!hoverMenus || event.pointerType !== "mouse") return;
-        closeTimer.current = setTimeout(() => setOpenOn(null), 200);
+        closeTimer.current = setTimeout(() => setOpen(false), 100);
       }}
     >
       <button
@@ -245,7 +262,7 @@ function DropdownTab({ item, pathname }: { item: NavItem; pathname: string }) {
         aria-expanded={open}
         aria-controls={menuId}
         onPointerDown={click.onPointerDown}
-        onClick={() => setOpenOn((click.takeMouse() && hoverMenus) || !open ? pathname : null)}
+        onClick={() => setOpen((click.takeMouse() && hoverMenus) || !open)}
         className={`flex items-center gap-1 ${TAB} ${active ? TAB_ACTIVE : TAB_IDLE}`}
       >
         {item.label}
@@ -455,6 +472,7 @@ function MobileMenu({ items, pathname }: { items: NavItem[]; pathname: string })
 /** The site header. `items` come from the server (lib/nav.ts) with drafts already removed. */
 export function SiteNav({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
+  const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
 
   return (
     // The border is the separator between the nav and the page content.
@@ -487,7 +505,15 @@ export function SiteNav({ items }: { items: NavItem[] }) {
         <ul className="flex flex-wrap justify-center gap-0.5 pt-4 pb-3 sm:gap-4">
           {items.map((item) => {
             if (item.children) {
-              return <DropdownTab key={item.href} item={item} pathname={pathname} />;
+              return (
+                <DropdownTab
+                  key={item.href}
+                  item={item}
+                  pathname={pathname}
+                  openMenu={openMenu}
+                  setOpenMenu={setOpenMenu}
+                />
+              );
             }
             const active = isActive(item.href, pathname);
             return (
