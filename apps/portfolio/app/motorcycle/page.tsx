@@ -4,7 +4,7 @@ import { mediaUrl } from "@/lib/media";
 
 export const metadata: Metadata = { title: "Motorcycle" };
 
-// Page content lives here in code. Photos go in sites/james/media/motorcycle/ (resized WebP; keep
+// Page content lives here in code. Photos go in apps/portfolio/media/motorcycle/ (resized WebP; keep
 // full-size originals in media-originals/) and are uploaded with `pnpm media:push`; reference them
 // with mediaUrl("motorcycle/<file>").
 // Photos are shown whole, so each frame matches its photo: 4:3 by default, `portrait: true` for 3:4.

@@ -1,16 +1,16 @@
 # Portfolio
 
-Multi-site portfolios. Each portfolio (`sites/<slug>`) is its own static Next.js export on its own domain (S3 + CloudFront), with its text in code and its photos in S3. A shared NestJS backend (PostgreSQL via Prisma) and admin app handle sign-in, sites and members, and are the base for future admin features.
+My portfolio (`apps/portfolio`), a static Next.js export on jamessaporito.com (S3 + CloudFront) with its text in code and its photos in S3. Alongside it, a NestJS backend (PostgreSQL via Prisma) and a members-only admin app make up a private, personal admin, the base for future admin features.
 
 ## Layout
 
 ```
-sites/<slug>        One Next.js app per portfolio (static export, own domain and design)
-apps/admin          Shared admin UI for all sites (static export, GitHub sign-in)
-apps/backend        Shared NestJS API + Better Auth (bundled with tsdown)
+apps/portfolio      The portfolio site (static export, jamessaporito.com)
+apps/admin          Personal admin UI for members (static export, GitHub sign-in)
+apps/backend        NestJS API + Better Auth (bundled with tsdown)
 packages/db         Prisma schema, migrations, and client
 packages/contracts  Zod schemas and types shared by apps
-packages/media      `portfolio-media` CLI that syncs site photos with S3
+packages/media      `portfolio-media` CLI that syncs the portfolio photos with S3
 packages/ui         Shared React components
 packages/config     Shared tsconfig, oxlint, and Prettier presets
 infra/              Terraform (planned)
@@ -36,11 +36,11 @@ Then fill in `.env`:
 
 ## Docker (recommended)
 
-One command starts everything: Postgres, s3mock, the backend (after applying migrations and seeding site `james`), admin, and every site app, all with hot reload.
+One command starts everything: Postgres, s3mock, the backend (after applying migrations), admin, and the portfolio, all with hot reload.
 
 ```sh
-pnpm dev:docker       # site-james :3000, admin :3001, backend :4000
-pnpm preview:docker   # sites/james production build via nginx, http://localhost:8080 (SITE=<slug> for another)
+pnpm dev:docker       # portfolio :3000, admin :3001, backend :4000
+pnpm preview:docker   # portfolio production build via nginx, http://localhost:8080
 ```
 
 These wrap `docker compose up --build` and `docker compose --profile preview up --build preview`.
@@ -55,26 +55,27 @@ Apps run on your machine; Postgres and s3mock still run in Docker and are starte
 
 ```sh
 pnpm install
-pnpm dev          # site-james :3000, admin :3001, backend :4000
-pnpm build        # static exports to sites/*/out and apps/admin/out, backend bundle to apps/backend/dist
+pnpm dev          # portfolio :3000, admin :3001, backend :4000
+pnpm build        # static exports to apps/portfolio/out and apps/admin/out, backend bundle to apps/backend/dist
 pnpm preview      # build, then serve each site and the admin
 pnpm test         # backend tests against the local database
 pnpm db:migrate   # create a migration after editing packages/db/prisma/schema.prisma
-pnpm db:studio    # browse the database
-pnpm media:push   # upload new/changed photos from sites/*/media/ to S3
+pnpm media:push   # upload new/changed photos from apps/portfolio/media/ to S3
 pnpm media:pull   # download photos missing locally
 pnpm lint
 pnpm typecheck
 pnpm format
 ```
 
-Task ordering lives in `turbo.json`: `@portfolio/db` owns `db:up` (start Postgres), `db:deploy` (apply migrations) and `db:seed`, and the backend's `dev` and `test` depend on them; each site's `media:up` starts s3mock before its `dev`. Run `turbo` from inside a package folder to scope it to that package.
+Task ordering lives in `turbo.json`: `@portfolio/db` owns `db:up` (start Postgres), `db:deploy` (apply migrations), and the backend's `dev` and `test` depend on them; the portfolio's `media:up` starts s3mock before its `dev`. Run `turbo` from inside a package folder to scope it to that package.
+
+To browse the local database (e.g. in TablePlus), connect to `postgresql://portfolio:portfolio@localhost:5432/portfolio` (host `localhost`, port `5432`, user and password `portfolio`, database `portfolio`) while Postgres is running.
 
 ## Content and photos
 
-Each site's text and layout are code in `sites/<slug>` (for example `sites/james/app/motorcycle/page.tsx`); changes ship by committing and deploying.
+The portfolio's text and layout are code in `apps/portfolio` (for example `apps/portfolio/app/motorcycle/page.tsx`); changes ship by committing and deploying.
 
-Photos are kept out of git. Keep full-size originals in `sites/<slug>/media-originals/` and put web-ready copies in `sites/<slug>/media/` (both gitignored), one folder per page, and reference them in code with `mediaUrl("motorcycle/hero.webp")` from `@/lib/media`. To make a web-ready copy (about 2200px wide WebP, metadata stripped; needs `brew install webp`):
+Photos are kept out of git. Keep full-size originals in `apps/portfolio/media-originals/` and put web-ready copies in `apps/portfolio/media/` (both gitignored), one folder per page, and reference them in code with `mediaUrl("motorcycle/hero.webp")` from `@/lib/media`. To make a web-ready copy (about 2200px wide WebP, metadata stripped; `cwebp` is in the dev container, or `brew install webp` on a Mac):
 
 ```sh
 cwebp -q 80 -resize 2200 0 -metadata none media-originals/motorcycle/hero.jpeg -o media/motorcycle/hero.webp
@@ -82,19 +83,10 @@ cwebp -q 80 -resize 2200 0 -metadata none media-originals/motorcycle/hero.jpeg -
 
 `pnpm media:push` uploads new or changed files to the `media/` prefix of the site's bucket, and `pnpm media:pull` downloads anything you don't have locally (new machine, or after a teammate's push).
 
-- Locally the bucket is `site-<slug>` in [s3mock](https://github.com/adobe/S3Mock), and `next dev` loads photos from it (`sites/<slug>/.env.development`).
-- In production CloudFront serves them from the site's own domain at `/media/`. To upload to production, run `pnpm media:push:prod` from the site folder with `AWS_PROFILE` set; it sets `S3_ENDPOINT=` (empty, meaning real AWS) and `MEDIA_BUCKET` to the site's bucket. Deploys never touch `media/`, so photos can go up before or after a deploy.
-- Run the commands from `sites/<slug>` to sync only that site.
+- Locally the bucket is `portfolio` in [s3mock](https://github.com/adobe/S3Mock), and `next dev` loads photos from it (`apps/portfolio/.env.development`).
+- In production CloudFront serves them from the site's own domain at `/media/`. To upload to production, run `pnpm media:push:prod` from `apps/portfolio` with `AWS_PROFILE` set; it sets `S3_ENDPOINT=` (empty, meaning real AWS) and `MEDIA_BUCKET` to the site's bucket. Deploys never touch `media/`, so photos can go up before or after a deploy.
 
-## Sites and access
+## Admin access
 
-- **Platform admins** (`ADMIN_GITHUB_IDS`) create sites in the admin's Sites page and can manage every site.
-- Each site has **owners** (manage the site and its members) and **editors** (a narrower role for future admin features). Owners invite people by GitHub username; an invite becomes a membership when that account first signs in. Removing someone from their last site signs them out and blocks future sign-ins.
-
-### Adding a site
-
-1. Create it in the admin (Sites page). Its slug must match the app folder.
-2. Copy `sites/james` to `sites/<slug>`, rename the package to `@portfolio/site-<slug>`, and give it its own design.
-3. Add a `site-<slug>` service to `docker-compose.yml` on the next free port (3002, …) with its `node_modules`/`.next` volumes, and pre-create those mount points in the Dockerfile `dev` stage.
-4. Add `site-<slug>` to s3mock's `COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS` (comma-separated), and point its `.env.development` at `http://localhost:9090/site-<slug>/media`.
-5. Hosting (its own bucket, CloudFront distribution and certificate) is configured per site in Terraform; see `infra/README.md`.
+- **Admins** (`ADMIN_GITHUB_IDS`) can always sign in, and add or remove members on the admin's Members page.
+- **Members** are added by GitHub username and can sign in from then on, whether or not they've signed in before. Removing a member signs them out and blocks future sign-ins.

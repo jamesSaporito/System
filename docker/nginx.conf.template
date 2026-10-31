@@ -1,6 +1,5 @@
 # Mimics the CloudFront setup: clean URLs resolve to index.html (no redirects), unknown paths
-# return /404.html with a 404 status, and /media/ is served from the site's S3 bucket.
-# Rendered at container start; ${SITE} is substituted from the environment.
+# return /404.html with a 404 status, and /media/ is served from the portfolio's S3 bucket.
 server {
     listen 8080;
     server_name _;
@@ -16,7 +15,7 @@ server {
     }
 
     location /media/ {
-        proxy_pass http://s3mock:9090/site-${SITE}/media/;
+        proxy_pass http://s3mock:9090/portfolio/media/;
         # Missing photos get the site's 404 page, like CloudFront's custom error response.
         proxy_intercept_errors on;
     }

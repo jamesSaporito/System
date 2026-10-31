@@ -12,10 +12,10 @@ next-env.d.ts
 # Turborepo
 .turbo/
 
-# Site photos: synced to S3 with `pnpm media:push` / `media:pull`, never committed
-sites/*/media/
+# Portfolio photos: synced to S3 with `pnpm media:push` / `media:pull`, never committed
+apps/portfolio/media/
 # Full-size originals kept locally; resized copies go in media/
-sites/*/media-originals/
+apps/portfolio/media-originals/
 
 # Env
 .env

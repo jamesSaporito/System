@@ -82,7 +82,7 @@ function cookieHeader(response: Response): string {
 
 /**
  * Fakes GitHub's OAuth and REST APIs. The authorization code is the user's numeric ID, so tests
- * can sign in several identities. `logins` maps usernames to IDs for invite lookups.
+ * can sign in several identities. `logins` maps usernames to IDs for member lookups.
  */
 export function fakeGithub(logins: Record<string, number> = {}): void {
   const realFetch = globalThis.fetch;

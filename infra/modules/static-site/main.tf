@@ -1,4 +1,4 @@
-# One static site (`sites/<slug>` export) behind CloudFront. Behavior mirrors
+# One static site (a Next.js static export) behind CloudFront. Behavior mirrors
 # docker/nginx.conf.template: clean URLs resolve to index.html without redirects, missing paths
 # return /404.html with a 404 status, and photos are served from the same bucket at /media/.
 #

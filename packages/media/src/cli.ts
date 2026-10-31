@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
- * Syncs a site's photos between its local, gitignored `media/` folder and the `media/` prefix of
- * its S3 bucket, which CloudFront serves at https://<domain>/media/.
+ * Syncs the portfolio's photos between its local, gitignored `media/` folder and the `media/`
+ * prefix of its S3 bucket, which CloudFront serves at https://<domain>/media/.
  *
  *   portfolio-media push   upload new or changed local files
  *   portfolio-media pull   download files missing (or different) locally
  *
- * Run from a site folder (sites/<slug>); the slug picks the bucket. Defaults to the local s3mock.
- * Env: S3_ENDPOINT (set it empty to use real AWS), MEDIA_BUCKET (default site-<slug>),
+ * Run from the app folder (apps/portfolio). Defaults to the local s3mock.
+ * Env: S3_ENDPOINT (set it empty to use real AWS), MEDIA_BUCKET (default: the folder's name),
  * plus the usual AWS_PROFILE / AWS_REGION / credentials for AWS.
  */
 import { createHash } from "node:crypto";
@@ -41,14 +41,13 @@ type FileInfo = { size: number; md5: string | null };
 
 const command = process.argv[2];
 if (command !== "push" && command !== "pull") {
-  console.error("Usage: portfolio-media <push|pull> (run from sites/<slug>)");
+  console.error("Usage: portfolio-media <push|pull> (run from apps/portfolio)");
   process.exit(1);
 }
 
-const siteDir = process.cwd();
-const slug = path.basename(siteDir);
-const localRoot = path.join(siteDir, "media");
-const bucket = process.env.MEDIA_BUCKET || `site-${slug}`;
+const appDir = process.cwd();
+const localRoot = path.join(appDir, "media");
+const bucket = process.env.MEDIA_BUCKET || path.basename(appDir);
 const endpoint = process.env.S3_ENDPOINT ?? "http://localhost:9090";
 
 const s3 = new S3Client({

@@ -9,18 +9,12 @@ export const ACCOUNT_NOT_ALLOWED = "account_not_allowed";
 const GITHUB = "github";
 
 export function createAuth(env: Env, prisma: PrismaClient) {
-  const platformAdminIds = new Set(env.ADMIN_GITHUB_IDS);
+  const adminIds = new Set(env.ADMIN_GITHUB_IDS);
 
-  /** Platform admins, anyone with a pending invite, and anyone who still belongs to a site. */
+  /** Admins and anyone on the members list. */
   async function canSignIn(githubId: string): Promise<boolean> {
-    if (platformAdminIds.has(githubId)) return true;
-    const [invites, memberships] = await Promise.all([
-      prisma.siteInvite.count({ where: { githubId } }),
-      prisma.siteMember.count({
-        where: { user: { accounts: { some: { providerId: GITHUB, accountId: githubId } } } },
-      }),
-    ]);
-    return invites + memberships > 0;
+    if (adminIds.has(githubId)) return true;
+    return (await prisma.member.count({ where: { githubId } })) > 0;
   }
 
   return betterAuth({
@@ -36,7 +30,7 @@ export function createAuth(env: Env, prisma: PrismaClient) {
     },
     user: {
       // Runs before a user is created and on every GitHub sign-in, with the fresh GitHub profile,
-      // so strangers never get a row and removing someone's last membership locks them out.
+      // so strangers never get a row and removing a member locks them out.
       validateUserInfo: async ({ source }) => {
         const id = source.oauth?.providerId === GITHUB ? source.oauth.profile?.id : undefined;
         // GitHub sends a number; accept a string too in case Better Auth normalizes it.
@@ -46,27 +40,6 @@ export function createAuth(env: Env, prisma: PrismaClient) {
           error: ACCOUNT_NOT_ALLOWED,
           errorDescription: "This GitHub account isn't allowed to sign in.",
         };
-      },
-    },
-    databaseHooks: {
-      account: {
-        create: {
-          // First sign-in: turn this GitHub account's pending invites into memberships.
-          after: async (account) => {
-            if (account.providerId !== GITHUB) return;
-            const invites = await prisma.siteInvite.findMany({
-              where: { githubId: account.accountId },
-            });
-            if (invites.length === 0) return;
-            await prisma.$transaction([
-              prisma.siteMember.createMany({
-                data: invites.map(({ siteId, role }) => ({ siteId, role, userId: account.userId })),
-                skipDuplicates: true,
-              }),
-              prisma.siteInvite.deleteMany({ where: { githubId: account.accountId } }),
-            ]);
-          },
-        },
       },
     },
   });

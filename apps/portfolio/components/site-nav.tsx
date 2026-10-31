@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import type { NavItem } from "@/lib/nav";
 
-// The logo is a design asset, so it's committed: put it at sites/james/public/logo.svg (or .png),
+// The logo is a design asset, so it's committed: put it at apps/portfolio/public/logo.svg (or .png),
 // set `src` to "/logo.svg", and set width/height to its intrinsic size. It's displayed 56px tall
 // on phones and 64px on larger screens.
 // The logo is black on transparent, so dark mode inverts it to white (`dark:invert` below).

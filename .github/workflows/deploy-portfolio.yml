@@ -1,17 +1,17 @@
-# Builds sites/james and publishes it to its S3 bucket behind CloudFront (infra/modules/static-site).
-# Needs the repository variables AWS_DEPLOY_ROLE_ARN (output of infra/bootstrap), SITE_JAMES_BUCKET
-# and SITE_JAMES_DISTRIBUTION_ID (outputs of infra/envs/prod); skipped until SITE_JAMES_BUCKET is
+# Builds apps/portfolio and publishes it to its S3 bucket behind CloudFront (infra/modules/static-site).
+# Needs the repository variables AWS_DEPLOY_ROLE_ARN (output of infra/bootstrap), PORTFOLIO_BUCKET
+# and PORTFOLIO_DISTRIBUTION_ID (outputs of infra/envs/prod); skipped until PORTFOLIO_BUCKET is
 # set. Photos under media/ are uploaded separately with `pnpm media:push` and never deleted here.
-name: Deploy james
+name: Deploy portfolio
 
 on:
   push:
     branches: [main]
     paths:
-      - "sites/james/**"
+      - "apps/portfolio/**"
       - "packages/**"
       - "pnpm-lock.yaml"
-      - ".github/workflows/deploy-site-james.yml"
+      - ".github/workflows/deploy-portfolio.yml"
   workflow_dispatch:
 
 permissions:
@@ -19,18 +19,18 @@ permissions:
 
 # Never let two deploys interleave their syncs; a newer push waits for the current one.
 concurrency:
-  group: deploy-site-james
+  group: deploy-portfolio
   cancel-in-progress: false
 
 jobs:
   deploy:
-    if: vars.SITE_JAMES_BUCKET != '' && github.ref == 'refs/heads/main'
+    if: vars.PORTFOLIO_BUCKET != '' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
     env:
-      BUCKET: ${{ vars.SITE_JAMES_BUCKET }}
+      BUCKET: ${{ vars.PORTFOLIO_BUCKET }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -47,7 +47,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Build
-        run: pnpm turbo run build --filter=@portfolio/site-james
+        run: pnpm turbo run build --filter=@portfolio/portfolio
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:
@@ -57,7 +57,7 @@ jobs:
       # New hashed assets go up before the HTML that references them. They're immutable; everything
       # else is re-checked by browsers on each visit (CloudFront caches it until the invalidation).
       - name: Upload
-        working-directory: sites/james/out
+        working-directory: apps/portfolio/out
         run: |
           aws s3 sync _next/static "s3://$BUCKET/_next/static" \
             --cache-control "public,max-age=31536000,immutable"
@@ -70,9 +70,9 @@ jobs:
             --paths "/*" --query Invalidation.Id --output text)
           aws cloudfront wait invalidation-completed --distribution-id "$DISTRIBUTION_ID" --id "$id"
         env:
-          DISTRIBUTION_ID: ${{ vars.SITE_JAMES_DISTRIBUTION_ID }}
+          DISTRIBUTION_ID: ${{ vars.PORTFOLIO_DISTRIBUTION_ID }}
 
       # Only once no cached page can reference them, drop the previous build's assets.
       - name: Remove old assets
-        working-directory: sites/james/out
+        working-directory: apps/portfolio/out
         run: aws s3 sync _next/static "s3://$BUCKET/_next/static" --delete

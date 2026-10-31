@@ -9,18 +9,17 @@ import {
 } from "../test/support";
 import { ACCOUNT_NOT_ALLOWED } from "./auth";
 
-const PLATFORM_ADMIN = 1000;
-const INVITED = 1001;
+const ADMIN = 1000;
+const MEMBER = 1001;
 const STRANGER = 1002;
-const SITE_SLUG = "auth-test-site";
 
-const env = testEnv({ ADMIN_GITHUB_IDS: [String(PLATFORM_ADMIN)] });
+const env = testEnv({ ADMIN_GITHUB_IDS: [String(ADMIN)] });
 const prisma = createPrismaClient(env.DATABASE_URL);
 let testApp: TestApp;
 
 async function cleanUp() {
   await prisma.user.deleteMany({ where: { email: { endsWith: TEST_EMAIL_DOMAIN } } });
-  await prisma.site.deleteMany({ where: { slug: SITE_SLUG } });
+  await prisma.member.deleteMany({ where: { githubId: String(MEMBER) } });
 }
 
 beforeAll(async () => {
@@ -38,25 +37,15 @@ afterAll(async () => {
 });
 
 describe("GitHub sign-in", () => {
-  it("lets platform admins in", async () => {
-    const result = await testApp.signIn(PLATFORM_ADMIN);
+  it("lets admins in", async () => {
+    const result = await testApp.signIn(ADMIN);
     expect(result).toHaveProperty("cookie");
   });
 
-  it("turns an invite into a membership on first sign-in", async () => {
-    const site = await prisma.site.create({ data: { slug: SITE_SLUG, name: "Test" } });
-    await prisma.siteInvite.create({
-      data: { siteId: site.id, githubId: String(INVITED), githubLogin: "invited", role: "EDITOR" },
-    });
+  it("lets in members added before their first sign-in", async () => {
+    await prisma.member.create({ data: { githubId: String(MEMBER), githubLogin: "member" } });
 
-    expect(await testApp.signIn(INVITED)).toHaveProperty("cookie");
-
-    const user = await prisma.user.findUniqueOrThrow({
-      where: { email: `${INVITED}${TEST_EMAIL_DOMAIN}` },
-      include: { memberships: true },
-    });
-    expect(user.memberships).toMatchObject([{ siteId: site.id, role: "EDITOR" }]);
-    expect(await prisma.siteInvite.count({ where: { siteId: site.id } })).toBe(0);
+    expect(await testApp.signIn(MEMBER)).toHaveProperty("cookie");
   });
 
   it("refuses anyone else without creating a user", async () => {
@@ -66,14 +55,11 @@ describe("GitHub sign-in", () => {
     );
   });
 
-  it("refuses members once they've been removed from their last site", async () => {
-    const site = await prisma.site.create({ data: { slug: SITE_SLUG, name: "Test" } });
-    await prisma.siteInvite.create({
-      data: { siteId: site.id, githubId: String(INVITED), githubLogin: "invited", role: "EDITOR" },
-    });
-    await testApp.signIn(INVITED);
-    await prisma.siteMember.deleteMany({ where: { siteId: site.id } });
+  it("refuses members once they've been removed", async () => {
+    await prisma.member.create({ data: { githubId: String(MEMBER), githubLogin: "member" } });
+    await testApp.signIn(MEMBER);
+    await prisma.member.deleteMany({ where: { githubId: String(MEMBER) } });
 
-    expect(await testApp.signIn(INVITED)).toEqual({ error: ACCOUNT_NOT_ALLOWED });
+    expect(await testApp.signIn(MEMBER)).toEqual({ error: ACCOUNT_NOT_ALLOWED });
   });
 });

@@ -4,15 +4,13 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import type {
-  InviteMemberInput,
-  InviteResult,
-  MembersResponse,
-  SiteRole,
-} from "@portfolio/contracts";
+import type { AddMemberInput, Member, MembersResponse } from "@portfolio/contracts";
 import { AccessService } from "../auth/access.service";
+import { isUniqueViolation } from "../prisma/errors";
 import { PrismaService } from "../prisma/prisma.service";
 import { findGithubUser } from "./github";
+
+const GITHUB = "github";
 
 @Injectable()
 export class MembersService {
@@ -21,108 +19,66 @@ export class MembersService {
     private readonly access: AccessService,
   ) {}
 
-  async list(siteId: string): Promise<MembersResponse> {
-    const [members, invites] = await Promise.all([
-      this.prisma.client.siteMember.findMany({
-        where: { siteId },
-        include: { user: { select: { name: true, email: true, image: true } } },
-        orderBy: { createdAt: "asc" },
-      }),
-      this.prisma.client.siteInvite.findMany({ where: { siteId }, orderBy: { createdAt: "asc" } }),
-    ]);
+  async list(): Promise<MembersResponse> {
+    const members = await this.prisma.client.member.findMany({ orderBy: { createdAt: "asc" } });
+    // Members are keyed by GitHub ID, so join to users through their GitHub accounts.
+    const accounts = await this.prisma.client.account.findMany({
+      where: { providerId: GITHUB, accountId: { in: members.map(({ githubId }) => githubId) } },
+      select: { accountId: true, user: { select: { name: true, image: true } } },
+    });
+    const users = new Map(accounts.map(({ accountId, user }) => [accountId, user]));
     return {
-      members: members.map(({ userId, role, createdAt, user }) => ({
-        userId,
-        role,
-        createdAt: createdAt.toISOString(),
-        ...user,
-      })),
-      invites: invites.map(({ id, githubLogin, role, createdAt }) => ({
-        id,
-        githubLogin,
-        role,
-        createdAt: createdAt.toISOString(),
-      })),
+      members: members.map(({ id, githubId, githubLogin, createdAt }) =>
+        toMember({ id, githubLogin, createdAt, user: users.get(githubId) ?? null }),
+      ),
     };
   }
 
-  /** Adds an existing user directly; otherwise records an invite claimed on their first sign-in. */
-  async invite(
-    siteId: string,
-    invitedById: string,
-    input: InviteMemberInput,
-  ): Promise<InviteResult> {
+  /** Lets a GitHub account sign in, whether or not it has signed in before. */
+  async add(addedById: string, input: AddMemberInput): Promise<Member> {
     const githubUser = await findGithubUser(input.githubLogin);
     if (!githubUser)
       throw new BadRequestException(`GitHub user "${input.githubLogin}" doesn't exist`);
 
-    const account = await this.prisma.client.account.findFirst({
-      where: { providerId: "github", accountId: githubUser.id },
-      select: { userId: true },
-    });
-    if (account) {
-      const existing = await this.prisma.client.siteMember.findUnique({
-        where: { siteId_userId: { siteId, userId: account.userId } },
+    try {
+      const member = await this.prisma.client.member.create({
+        data: { githubId: githubUser.id, githubLogin: githubUser.login, addedById },
       });
-      if (existing) throw new ConflictException(`${githubUser.login} is already a member`);
-      await this.prisma.client.siteMember.create({
-        data: { siteId, userId: account.userId, role: input.role },
+      const account = await this.prisma.client.account.findFirst({
+        where: { providerId: GITHUB, accountId: githubUser.id },
+        select: { user: { select: { name: true, image: true } } },
       });
-      return { status: "added" };
-    }
-
-    await this.prisma.client.siteInvite.upsert({
-      where: { siteId_githubId: { siteId, githubId: githubUser.id } },
-      create: {
-        siteId,
-        githubId: githubUser.id,
-        githubLogin: githubUser.login,
-        role: input.role,
-        invitedById,
-      },
-      update: { role: input.role, githubLogin: githubUser.login },
-    });
-    return { status: "invited" };
-  }
-
-  async cancelInvite(siteId: string, inviteId: string): Promise<void> {
-    const { count } = await this.prisma.client.siteInvite.deleteMany({
-      where: { id: inviteId, siteId },
-    });
-    if (count === 0) throw new NotFoundException();
-  }
-
-  async updateRole(siteId: string, userId: string, role: SiteRole): Promise<void> {
-    const member = await this.findMember(siteId, userId);
-    if (member.role === "OWNER" && role !== "OWNER") await this.assertNotLastOwner(siteId);
-    await this.prisma.client.siteMember.update({
-      where: { siteId_userId: { siteId, userId } },
-      data: { role },
-    });
-  }
-
-  /** Removing someone's last membership also signs them out everywhere (they can't sign back in). */
-  async remove(siteId: string, userId: string): Promise<void> {
-    const member = await this.findMember(siteId, userId);
-    if (member.role === "OWNER") await this.assertNotLastOwner(siteId);
-    await this.prisma.client.siteMember.delete({ where: { siteId_userId: { siteId, userId } } });
-
-    const { isPlatformAdmin, memberships } = await this.access.load(userId);
-    if (!isPlatformAdmin && memberships.size === 0) {
-      await this.prisma.client.session.deleteMany({ where: { userId } });
+      return toMember({ ...member, user: account?.user ?? null });
+    } catch (error) {
+      if (isUniqueViolation(error))
+        throw new ConflictException(`${githubUser.login} is already a member`);
+      throw error;
     }
   }
 
-  private async findMember(siteId: string, userId: string) {
-    const member = await this.prisma.client.siteMember.findUnique({
-      where: { siteId_userId: { siteId, userId } },
-    });
+  /** Also signs them out everywhere (they can't sign back in), unless they're an admin. */
+  async remove(memberId: string): Promise<void> {
+    const member = await this.prisma.client.member.findUnique({ where: { id: memberId } });
     if (!member) throw new NotFoundException();
-    return member;
-  }
+    await this.prisma.client.member.delete({ where: { id: memberId } });
 
-  private async assertNotLastOwner(siteId: string): Promise<void> {
-    const owners = await this.prisma.client.siteMember.count({ where: { siteId, role: "OWNER" } });
-    if (owners <= 1) throw new ConflictException("A site needs at least one owner");
+    if (this.access.isAdminGithubId(member.githubId)) return;
+    await this.prisma.client.session.deleteMany({
+      where: { user: { accounts: { some: { providerId: GITHUB, accountId: member.githubId } } } },
+    });
   }
+}
+
+function toMember({
+  id,
+  githubLogin,
+  createdAt,
+  user,
+}: {
+  id: string;
+  githubLogin: string;
+  createdAt: Date;
+  user: { name: string; image: string | null } | null;
+}): Member {
+  return { id, githubLogin, createdAt: createdAt.toISOString(), user };
 }
