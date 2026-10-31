@@ -27,22 +27,22 @@ output "database_client_security_group_id" {
   value = one(module.database[*].client_security_group_id)
 }
 
-output "site_james_bucket" {
-  description = "SITE_JAMES_BUCKET, and MEDIA_BUCKET for `pnpm media:push`."
-  value       = module.site_james.bucket
+output "portfolio_bucket" {
+  description = "PORTFOLIO_BUCKET, and MEDIA_BUCKET for `pnpm media:push`."
+  value       = module.portfolio.bucket
 }
 
-output "site_james_distribution_id" {
-  description = "SITE_JAMES_DISTRIBUTION_ID."
-  value       = module.site_james.distribution_id
+output "portfolio_distribution_id" {
+  description = "PORTFOLIO_DISTRIBUTION_ID."
+  value       = module.portfolio.distribution_id
 }
 
-output "site_james_cloudfront_domain" {
+output "portfolio_cloudfront_domain" {
   description = "Target for the www CNAME at the registrar."
-  value       = module.site_james.cloudfront_domain
+  value       = module.portfolio.cloudfront_domain
 }
 
-output "site_james_certificate_validation" {
+output "portfolio_certificate_validation" {
   description = "CNAME records to add at the registrar for the certificate."
-  value       = module.site_james.certificate_validation_records
+  value       = module.portfolio.certificate_validation_records
 }

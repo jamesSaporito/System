@@ -3,25 +3,17 @@ import {
   type ExecutionContext,
   ForbiddenException,
   Injectable,
-  NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import type { SiteRole } from "@portfolio/contracts";
 import { fromNodeHeaders } from "better-auth/node";
-import {
-  ALLOW_ANONYMOUS,
-  type AuthenticatedRequest,
-  hasRole,
-  REQUIRE_PLATFORM_ADMIN,
-  REQUIRE_SITE_ROLE,
-} from "./access";
+import { ALLOW_ANONYMOUS, type AuthenticatedRequest, REQUIRE_ADMIN } from "./access";
 import { AccessService } from "./access.service";
 import { AuthService } from "./auth.service";
 
 /**
- * Global guard: every route requires a session unless marked @AllowAnonymous(), plus whatever
- * @RequirePlatformAdmin() / @RequireSiteRole() the route declares.
+ * Global guard: every route requires a session from an admin or member unless marked
+ * @AllowAnonymous(), plus admin when the route declares @RequireAdmin().
  */
 @Injectable()
 export class SessionGuard implements CanActivate {
@@ -40,26 +32,14 @@ export class SessionGuard implements CanActivate {
       headers: fromNodeHeaders(request.headers),
     });
     if (!session) throw new UnauthorizedException();
-    request.auth = { ...session, ...(await this.access.load(session.user.id)) };
 
-    if (
-      this.reflector.getAllAndOverride<boolean>(REQUIRE_PLATFORM_ADMIN, targets) &&
-      !request.auth.isPlatformAdmin
-    ) {
+    // Sign-in already checks this; re-checking covers sessions that outlive a removed member.
+    const { isAdmin, isMember } = await this.access.load(session.user.id);
+    if (!isAdmin && !isMember) throw new ForbiddenException();
+    request.auth = { ...session, isAdmin };
+
+    if (this.reflector.getAllAndOverride<boolean>(REQUIRE_ADMIN, targets) && !isAdmin) {
       throw new ForbiddenException();
-    }
-
-    const requiredRole = this.reflector.getAllAndOverride<SiteRole | undefined>(
-      REQUIRE_SITE_ROLE,
-      targets,
-    );
-    if (requiredRole) {
-      const siteId = request.params.siteId;
-      if (typeof siteId !== "string")
-        throw new Error("@RequireSiteRole() needs a :siteId route param");
-      const role = await this.access.roleFor(request.auth, siteId);
-      if (!role) throw new NotFoundException();
-      if (!hasRole(role, requiredRole)) throw new ForbiddenException();
     }
     return true;
   }

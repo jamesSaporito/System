@@ -33,12 +33,12 @@ Terraform for AWS (Terraform `~> 1.17`, AWS provider `~> 6.70`, region `us-east-
 
 DNS stays at the registrar (Squarespace), so a few records are added there by hand. For `jamessaporito.com`:
 
-1. After the first prod apply, add the `site_james_bucket` and `site_james_distribution_id` outputs as the GitHub variables `SITE_JAMES_BUCKET` and `SITE_JAMES_DISTRIBUTION_ID`.
-2. At the registrar, add each CNAME from the `site_james_certificate_validation` output, and wait until the certificate shows **Issued** in ACM (usually minutes).
-3. Set `attach_domain = true` on `module "site_james"` in `envs/prod/main.tf`, commit, and apply again. With it on before the records exist, the apply waits on validation.
-4. At the registrar, point `www` at the `site_james_cloudfront_domain` output with a CNAME, and forward the bare domain to `https://www.jamessaporito.com` (a bare domain can't have a CNAME).
-5. Upload the photos: `pnpm media:push:prod` (from `sites/james`, with `AWS_PROFILE` set).
-6. Deploy: push a change under `sites/james`, or run **Actions → Deploy james → Run workflow**.
+1. After the first prod apply, add the `portfolio_bucket` and `portfolio_distribution_id` outputs as the GitHub variables `PORTFOLIO_BUCKET` and `PORTFOLIO_DISTRIBUTION_ID`.
+2. At the registrar, add each CNAME from the `portfolio_certificate_validation` output, and wait until the certificate shows **Issued** in ACM (usually minutes).
+3. Set `attach_domain = true` on `module "portfolio"` in `envs/prod/main.tf`, commit, and apply again. With it on before the records exist, the apply waits on validation.
+4. At the registrar, point `www` at the `portfolio_cloudfront_domain` output with a CNAME, and forward the bare domain to `https://www.jamessaporito.com` (a bare domain can't have a CNAME).
+5. Upload the photos: `pnpm media:push:prod` (from `apps/portfolio`, with `AWS_PROFILE` set).
+6. Deploy: push a change under `apps/portfolio`, or run **Actions → Deploy portfolio → Run workflow**.
 
 ## Running Terraform locally
 
@@ -84,9 +84,9 @@ GitHub Actions doesn't use these profiles; it assumes the bootstrap's OIDC roles
 - Production migrations (`prisma migrate deploy`) run only as an automated one-off task inside AWS, in the VPC with the database client security group, triggered by the deploy pipeline. Never manually from a laptop.
 - CI authenticates via GitHub OIDC; no long-lived AWS keys. The `plan` role (read-only) trusts pull requests and pushes to `main`; the `apply` role trusts only jobs in the `production` environment; the `deploy` role trusts `main` and can only sync the site buckets and invalidate CloudFront. Trust matches GitHub's ID-based OIDC subject (`repo:jamesSaporito@<owner id>/System@<repo id>:…`), so if the repository is renamed or moved, update `github_repository` and `github_repository_ids` in `bootstrap/variables.tf` and re-apply.
 - Pull requests and pushes to `main` only plan. Applying is always a deliberate step: run the Infra workflow on `main` (or apply locally).
-- The database is off by default (`enable_database = false` in `envs/prod`), so applying production for the sites doesn't create Aurora. Turn it on when the backend needs it.
+- The database is off by default (`enable_database = false` in `envs/prod`), so applying production for the site doesn't create Aurora. Turn it on when the backend needs it.
 - The repository is public, so account-specific values (the state bucket name, role ARNs) live in GitHub variables and a gitignored `backend.hcl`, not in code. Site bucket names come from the domain, so they need no account ID.
 - CloudFront must match `docker/nginx.conf.template`: a viewer-request CloudFront Function rewrites clean URLs to `index.html`, and 403/404 from S3 map to `/404.html` with a 404 status.
-- One `static-site` instance per site (`sites/<slug>`), each with its own bucket, distribution and certificate. The bucket also holds the site's photos under `media/` (uploaded with `pnpm media:push`), served from the same origin at `/media/*`; site deploys must not delete that prefix.
+- The portfolio (`apps/portfolio`) is one `static-site` instance with its own bucket, distribution and certificate. The bucket also holds the site's photos under `media/` (uploaded with `pnpm media:push`), served from the same origin at `/media/*`; site deploys must not delete that prefix.
 - Caching: `/_next/static/*` is immutable for a year; HTML and photos stay at the edge for a day, and each deploy invalidates `/*`. Browsers re-check HTML on every visit.
 - After any Terraform change, follow the `infracost` skill (`.claude/skills/infracost/SKILL.md`).

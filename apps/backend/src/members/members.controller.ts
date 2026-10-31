@@ -1,56 +1,34 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Post } from "@nestjs/common";
 import {
-  type InviteMemberInput,
-  type InviteResult,
-  inviteMemberSchema,
+  type AddMemberInput,
+  addMemberSchema,
+  type Member,
   type MembersResponse,
-  type UpdateMemberInput,
-  updateMemberSchema,
 } from "@portfolio/contracts";
-import { type AuthContext, CurrentAuth, RequireSiteRole } from "../auth/access";
+import { type AuthContext, CurrentAuth, RequireAdmin } from "../auth/access";
 import { MembersService } from "./members.service";
 
-@Controller("sites/:siteId")
-@RequireSiteRole("OWNER")
+@Controller("members")
+@RequireAdmin()
 export class MembersController {
   constructor(private readonly members: MembersService) {}
 
-  @Get("members")
-  list(@Param("siteId") siteId: string): Promise<MembersResponse> {
-    return this.members.list(siteId);
+  @Get()
+  list(): Promise<MembersResponse> {
+    return this.members.list();
   }
 
-  @Post("invites")
-  invite(
-    @Param("siteId") siteId: string,
+  @Post()
+  add(
     @CurrentAuth() auth: AuthContext,
-    @Body({ schema: inviteMemberSchema }) input: InviteMemberInput,
-  ): Promise<InviteResult> {
-    return this.members.invite(siteId, auth.user.id, input);
+    @Body({ schema: addMemberSchema }) input: AddMemberInput,
+  ): Promise<Member> {
+    return this.members.add(auth.user.id, input);
   }
 
-  @Delete("invites/:inviteId")
+  @Delete(":memberId")
   @HttpCode(204)
-  cancelInvite(
-    @Param("siteId") siteId: string,
-    @Param("inviteId") inviteId: string,
-  ): Promise<void> {
-    return this.members.cancelInvite(siteId, inviteId);
-  }
-
-  @Patch("members/:userId")
-  @HttpCode(204)
-  updateRole(
-    @Param("siteId") siteId: string,
-    @Param("userId") userId: string,
-    @Body({ schema: updateMemberSchema }) input: UpdateMemberInput,
-  ): Promise<void> {
-    return this.members.updateRole(siteId, userId, input.role);
-  }
-
-  @Delete("members/:userId")
-  @HttpCode(204)
-  remove(@Param("siteId") siteId: string, @Param("userId") userId: string): Promise<void> {
-    return this.members.remove(siteId, userId);
+  remove(@Param("memberId") memberId: string): Promise<void> {
+    return this.members.remove(memberId);
   }
 }

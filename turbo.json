@@ -16,20 +16,11 @@
       "dependsOn": ["db:up"],
       "cache": false
     },
-    "db:seed": {
-      "dependsOn": ["db:deploy"],
-      "cache": false
-    },
-    "db:studio": {
-      "dependsOn": ["db:up"],
-      "cache": false,
-      "persistent": true
-    },
     // Starts s3mock for native dev (a no-op inside the dev container).
     "media:up": {
       "cache": false
     },
-    // Sync sites/<slug>/media/ with the site's S3 bucket (s3mock unless S3_ENDPOINT is set empty).
+    // Sync apps/portfolio/media/ with its S3 bucket (s3mock unless S3_ENDPOINT is set empty).
     "media:push": {
       "dependsOn": ["media:up"],
       "passThroughEnv": ["S3_ENDPOINT", "MEDIA_BUCKET", "AWS_*"],
@@ -51,13 +42,13 @@
       "dependsOn": ["^typecheck", "db:generate", "^db:generate"]
     },
     "test": {
-      "dependsOn": ["db:generate", "^db:generate", "^db:seed"],
+      "dependsOn": ["db:generate", "^db:generate", "db:deploy", "^db:deploy"],
       // Tests hit the local database, so results aren't reproducible from inputs alone.
       "cache": false
     },
     "dev": {
-      // The backend gets a running, migrated, seeded database; sites get s3mock for photos.
-      "dependsOn": ["^db:generate", "^db:seed", "media:up"],
+      // The backend gets a running, migrated database; the portfolio gets s3mock for photos.
+      "dependsOn": ["^db:generate", "^db:deploy", "media:up"],
       "passThroughEnv": ["PORT"],
       "cache": false,
       "persistent": true

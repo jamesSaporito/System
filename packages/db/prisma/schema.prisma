@@ -11,77 +11,115 @@ datasource db {
 // Database naming: plural snake_case tables, snake_case columns, lowercase enum values.
 // Prisma has no global naming setting, so every model, multi-word field, and enum is mapped.
 
-enum SiteRole {
-  /// Edits content, publishes, and manages the site's members.
-  OWNER  @map("owner")
-  /// Edits content only.
-  EDITOR @map("editor")
-
-  @@map("site_role")
-}
-
-/// A portfolio with its own domain and its own frontend app in sites/<slug>.
-model Site {
-  id        String       @id @default(uuid(7))
-  /// Matches the frontend app's folder, sites/<slug>.
-  slug      String       @unique
-  name      String
-  /// Public domain, e.g. www.example.com. Informational; hosting is configured in Terraform.
-  domain    String?
-  members   SiteMember[]
-  invites   SiteInvite[]
-  createdAt DateTime     @default(now()) @map("created_at")
-  updatedAt DateTime     @updatedAt @map("updated_at")
-
-  @@map("sites")
-}
-
-model SiteMember {
-  siteId    String   @map("site_id")
-  site      Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  userId    String   @map("user_id")
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role      SiteRole
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@id([siteId, userId])
-  @@index([userId])
-  @@map("site_members")
-}
-
-/// A pending invite, turned into a SiteMember when that GitHub account first signs in.
-model SiteInvite {
+/// A GitHub account allowed to sign in to the admin, added by an admin by username. Admins
+/// (ADMIN_GITHUB_IDS) don't need a row. Linked to a User through accounts.account_id once they've
+/// signed in.
+model Member {
   id          String   @id @default(uuid(7))
-  siteId      String   @map("site_id")
-  site        Site     @relation(fields: [siteId], references: [id], onDelete: Cascade)
-  /// Numeric GitHub user ID; matches accounts.account_id once they sign in.
-  githubId    String   @map("github_id")
+  /// Numeric GitHub user ID; matches accounts.account_id.
+  githubId    String   @unique @map("github_id")
   githubLogin String   @map("github_login")
-  role        SiteRole
-  invitedById String?  @map("invited_by_id")
-  invitedBy   User?    @relation(fields: [invitedById], references: [id], onDelete: SetNull)
+  addedById   String?  @map("added_by_id")
+  addedBy     User?    @relation(fields: [addedById], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now()) @map("created_at")
 
-  @@unique([siteId, githubId])
-  @@index([githubId])
-  @@map("site_invites")
+  @@map("members")
+}
+
+// --- Security news briefs (generated daily; read by the admin).
+
+/// Section an item is listed under, in reading order (Postgres sorts enums by declaration
+/// order, so `orderBy: [{ section }, { position }]` yields the brief's order).
+enum SecurityBriefSection {
+  ACTIVELY_EXPLOITED @map("actively_exploited")
+  CRITICAL_AND_HIGH  @map("critical_and_high")
+  WORTH_KNOWING      @map("worth_knowing")
+
+  @@map("security_brief_section")
+}
+
+/// Severity as the brief states it; null on "Worth Knowing" items.
+enum SecuritySeverity {
+  CRITICAL @map("critical")
+  HIGH     @map("high")
+  MEDIUM   @map("medium")
+  LOW      @map("low")
+
+  @@map("security_severity")
+}
+
+/// One daily security news brief. One row per run date: a rerun the same day updates the row
+/// (upsert on run_on) and replaces its items. `markdown` keeps the whole brief as written.
+model SecurityBrief {
+  id         String              @id @default(uuid(7))
+  /// Calendar day the brief ran (the template's "Date" column).
+  runOn      DateTime            @unique @map("run_on") @db.Date
+  /// Window covered, inclusive (the "Covers" column).
+  coversFrom DateTime            @map("covers_from") @db.Date
+  coversTo   DateTime            @map("covers_to") @db.Date
+  /// "<Product> <CVE-ID>: <why>" or "Nothing critical".
+  mostUrgent String              @map("most_urgent")
+  /// The full brief as Markdown, exactly as generated.
+  markdown   String
+  items      SecurityBriefItem[]
+  createdAt  DateTime            @default(now()) @map("created_at")
+  updatedAt  DateTime            @updatedAt @map("updated_at")
+
+  @@map("security_briefs")
+}
+
+/// One entry of a brief: a headed item under "Actively Exploited" / "Critical and High", or a
+/// one-liner under "Worth Knowing" (only product, title, advisoryIds and sources filled).
+/// Items are replaced wholesale when a brief is regenerated, so no updated_at.
+model SecurityBriefItem {
+  id                 String               @id @default(uuid(7))
+  briefId            String               @map("brief_id")
+  brief              SecurityBrief        @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  section            SecurityBriefSection
+  /// 0-based order within the section; items are listed by urgency.
+  position           Int
+  product            String
+  /// What the flaw lets an attacker do; the whole line for "Worth Knowing" items.
+  title              String
+  /// CVE or GHSA ids, e.g. "CVE-2026-12345", "GHSA-xxxx-xxxx-xxxx".
+  advisoryIds        String[]             @default([]) @map("advisory_ids")
+  severity           SecuritySeverity?
+  cvssScore          Float?               @map("cvss_score")
+  /// CVSS version the score is on ("4.0", "3.1"); null when not stated.
+  cvssVersion        String?              @map("cvss_version")
+  /// Prose from the Severity line, e.g. "exploited in the wild since 2026-10-20".
+  exploitationStatus String?              @map("exploitation_status")
+  /// Date it entered CISA's KEV catalog, when the brief says so.
+  kevAddedOn         DateTime?            @map("kev_added_on") @db.Date
+  affected           String?
+  fix                String?
+  publishedOn        DateTime?            @map("published_on") @db.Date
+  whyItMatters       String?              @map("why_it_matters")
+  /// Carried over from the previous brief with a change; update_note says what.
+  isUpdate           Boolean              @default(false) @map("is_update")
+  updateNote         String?              @map("update_note")
+  /// [{ "label": string, "url": string }, ...]; shape enforced by securitySourceSchema.
+  sources            Json
+  createdAt          DateTime             @default(now()) @map("created_at")
+
+  @@unique([briefId, section, position])
+  @@map("security_brief_items")
 }
 
 // --- Better Auth (core). Field names must match what Better Auth expects;
 // it goes through the Prisma client, so only the database names are mapped.
 
 model User {
-  id            String       @id
+  id            String    @id
   name          String
-  email         String       @unique
-  emailVerified Boolean      @default(false) @map("email_verified")
+  email         String    @unique
+  emailVerified Boolean   @default(false) @map("email_verified")
   image         String?
   sessions      Session[]
   accounts      Account[]
-  memberships   SiteMember[]
-  invitesSent   SiteInvite[]
-  createdAt     DateTime     @default(now()) @map("created_at")
-  updatedAt     DateTime     @updatedAt @map("updated_at")
+  membersAdded  Member[]
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
 
   @@map("users")
 }

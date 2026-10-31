@@ -9,7 +9,7 @@ const envSchema = z.object({
   BETTER_AUTH_SECRET: z.string().min(32),
   GITHUB_CLIENT_ID: z.string().min(1),
   GITHUB_CLIENT_SECRET: z.string().min(1),
-  /// Comma-separated numeric GitHub user IDs of platform admins (create sites, manage everything).
+  /// Comma-separated numeric GitHub user IDs of admins, who manage members.
   ADMIN_GITHUB_IDS: z
     .string()
     .transform((value) =>

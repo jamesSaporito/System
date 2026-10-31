@@ -3,7 +3,7 @@ locals {
 }
 
 # The backend's network and database. Off until something uses the database, so applying prod for
-# the sites doesn't create (or bill for) Aurora.
+# the site doesn't create (or bill for) Aurora.
 module "network" {
   source = "../../modules/network"
   count  = var.enable_database ? 1 : 0
@@ -20,13 +20,19 @@ module "database" {
   subnet_ids = module.network[0].private_subnet_ids
 }
 
-# jamessaporito.com (sites/james). DNS stays at the registrar: add the certificate_validation
+# jamessaporito.com (apps/portfolio). DNS stays at the registrar: add the certificate_validation
 # records there, then set attach_domain = true and point www at the CloudFront domain.
-module "site_james" {
+module "portfolio" {
   source = "../../modules/static-site"
 
   domain        = "jamessaporito.com"
   aliases       = ["jamessaporito.com", "www.jamessaporito.com"]
   bucket_name   = "jamessaporito-com-site"
   attach_domain = true
+}
+
+# Renamed from site_james when the site moved to apps/portfolio.
+moved {
+  from = module.site_james
+  to   = module.portfolio
 }

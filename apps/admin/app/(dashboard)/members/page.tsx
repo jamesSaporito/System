@@ -1,36 +1,25 @@
 "use client";
 
-import {
-  type InviteResult,
-  type MembersResponse,
-  type SiteRole,
-  siteRoleSchema,
-} from "@portfolio/contracts";
+import type { Member, MembersResponse } from "@portfolio/contracts";
+import Image from "next/image";
 import { type FormEvent, useCallback, useState } from "react";
 import { api, describeError } from "@/lib/api";
 import { useResource } from "@/lib/use-resource";
 import { useWorkspace } from "@/lib/workspace";
 
-const ROLE_LABELS: Record<SiteRole, string> = { OWNER: "Owner", EDITOR: "Editor" };
-
 export default function MembersPage() {
-  const { site } = useWorkspace();
-  if (!site) return null;
-  if (site.role !== "OWNER") {
-    return <p className="text-neutral-500">Only owners of {site.name} can manage its members.</p>;
-  }
-  // Keyed so switching sites resets the page's state.
-  return <Members key={site.id} siteId={site.id} siteName={site.name} />;
+  const { me } = useWorkspace();
+  if (!me.isAdmin) return <p className="text-neutral-500">Only admins can manage members.</p>;
+  return <Members />;
 }
 
-function Members({ siteId, siteName }: { siteId: string; siteName: string }) {
-  const { me, reloadMe } = useWorkspace();
-  const load = useCallback(() => api<MembersResponse>(`/sites/${siteId}/members`), [siteId]);
+function Members() {
+  const load = useCallback(() => api<MembersResponse>("/members"), []);
   const { state, reload } = useResource(load);
   const [notice, setNotice] = useState<{ kind: "error" | "info"; text: string } | null>(null);
 
-  /** Runs a change, then refreshes the list (and /me if it might have changed our own access). */
-  async function mutate(action: () => Promise<unknown>, affectsMe = false) {
+  /** Runs a change, then refreshes the list. */
+  async function mutate(action: () => Promise<unknown>) {
     setNotice(null);
     try {
       await action();
@@ -38,14 +27,13 @@ function Members({ siteId, siteName }: { siteId: string; siteName: string }) {
       setNotice({ kind: "error", text: describeError(error) });
     }
     await reload();
-    if (affectsMe) await reloadMe();
   }
 
   return (
     <>
-      <h1 className="text-3xl font-bold">Members of {siteName}</h1>
+      <h1 className="text-3xl font-bold">Members</h1>
       <p className="mt-2 text-sm text-neutral-500">
-        Owners edit, publish, and manage members. Editors edit content only.
+        People who can sign in to this admin with GitHub.
       </p>
       {notice ? (
         <p
@@ -56,20 +44,14 @@ function Members({ siteId, siteName }: { siteId: string; siteName: string }) {
         </p>
       ) : null}
 
-      <InviteForm
-        onInvite={(githubLogin, role) =>
+      <AddForm
+        onAdd={(githubLogin) =>
           mutate(async () => {
-            const result = await api<InviteResult>(`/sites/${siteId}/invites`, {
+            const member = await api<Member>("/members", {
               method: "POST",
-              body: JSON.stringify({ githubLogin, role }),
+              body: JSON.stringify({ githubLogin }),
             });
-            setNotice({
-              kind: "info",
-              text:
-                result.status === "added"
-                  ? `${githubLogin} already had an account and was added.`
-                  : `Invited ${githubLogin}. They'll join when they first sign in with GitHub.`,
-            });
+            setNotice({ kind: "info", text: `Added ${member.githubLogin}.` });
           })
         }
       />
@@ -81,105 +63,57 @@ function Members({ siteId, siteName }: { siteId: string; siteName: string }) {
         </p>
       ) : null}
       {state.status === "ready" ? (
-        <>
+        state.data.members.length === 0 ? (
+          <p className="mt-6 text-neutral-500">No members yet.</p>
+        ) : (
           <ul className="mt-6 grid gap-2">
-            {state.data.members.map((member) => {
-              const isMe = member.userId === me.user.id;
-              return (
-                <li
-                  key={member.userId}
-                  className="flex flex-wrap items-center gap-3 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800"
+            {state.data.members.map((member) => (
+              <li
+                key={member.id}
+                className="flex flex-wrap items-center gap-3 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800"
+              >
+                {member.user?.image ? (
+                  <Image
+                    src={member.user.image}
+                    alt=""
+                    width={32}
+                    height={32}
+                    className="rounded-full"
+                  />
+                ) : null}
+                <span className="font-medium">{member.user?.name ?? member.githubLogin}</span>
+                <span className="text-sm text-neutral-500">
+                  @{member.githubLogin}
+                  {member.user ? null : " · hasn't signed in yet"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!window.confirm(`Remove ${member.githubLogin}? They'll be signed out.`))
+                      return;
+                    void mutate(() => api(`/members/${member.id}`, { method: "DELETE" }));
+                  }}
+                  className="ml-auto text-sm text-red-600 underline dark:text-red-400"
                 >
-                  <span className="font-medium">{member.name}</span>
-                  <span className="text-sm text-neutral-500">{member.email}</span>
-                  {isMe ? <span className="text-xs text-neutral-500">(you)</span> : null}
-                  <select
-                    aria-label={`Role for ${member.name}`}
-                    value={member.role}
-                    onChange={(event) => {
-                      const role = siteRoleSchema.parse(event.target.value);
-                      void mutate(
-                        () =>
-                          api(`/sites/${siteId}/members/${member.userId}`, {
-                            method: "PATCH",
-                            body: JSON.stringify({ role }),
-                          }),
-                        isMe,
-                      );
-                    }}
-                    className="ml-auto rounded-md border border-neutral-300 bg-transparent px-2 py-1 text-sm dark:border-neutral-700"
-                  >
-                    <option value="OWNER">{ROLE_LABELS.OWNER}</option>
-                    <option value="EDITOR">{ROLE_LABELS.EDITOR}</option>
-                  </select>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const prompt = isMe
-                        ? `Leave ${siteName}? You'll lose access to it.`
-                        : `Remove ${member.name} from ${siteName}?`;
-                      if (!window.confirm(prompt)) return;
-                      void mutate(
-                        () =>
-                          api(`/sites/${siteId}/members/${member.userId}`, { method: "DELETE" }),
-                        isMe,
-                      );
-                    }}
-                    className="text-sm text-red-600 underline dark:text-red-400"
-                  >
-                    {isMe ? "Leave" : "Remove"}
-                  </button>
-                </li>
-              );
-            })}
+                  Remove
+                </button>
+              </li>
+            ))}
           </ul>
-
-          {state.data.invites.length > 0 ? (
-            <>
-              <h2 className="mt-8 text-lg font-semibold">Pending invites</h2>
-              <ul className="mt-2 grid gap-2">
-                {state.data.invites.map((invite) => (
-                  <li
-                    key={invite.id}
-                    className="flex items-center gap-3 rounded-lg border border-dashed border-neutral-300 p-3 dark:border-neutral-700"
-                  >
-                    <span className="font-medium">{invite.githubLogin}</span>
-                    <span className="text-sm text-neutral-500">{ROLE_LABELS[invite.role]}</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void mutate(() =>
-                          api(`/sites/${siteId}/invites/${invite.id}`, { method: "DELETE" }),
-                        )
-                      }
-                      className="ml-auto text-sm underline"
-                    >
-                      Cancel
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : null}
-        </>
+        )
       ) : null}
     </>
   );
 }
 
-function InviteForm({
-  onInvite,
-}: {
-  onInvite: (githubLogin: string, role: SiteRole) => Promise<void>;
-}) {
+function AddForm({ onAdd }: { onAdd: (githubLogin: string) => Promise<void> }) {
   const [githubLogin, setGithubLogin] = useState("");
-  const [role, setRole] = useState<SiteRole>("EDITOR");
   const [pending, setPending] = useState(false);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setPending(true);
-    await onInvite(githubLogin.trim(), role);
+    await onAdd(githubLogin.trim());
     setPending(false);
     setGithubLogin("");
   }
@@ -195,23 +129,12 @@ function InviteForm({
           className="rounded-md border border-neutral-300 bg-transparent px-2 py-1 dark:border-neutral-700"
         />
       </label>
-      <label className="grid gap-1 text-sm">
-        Role
-        <select
-          value={role}
-          onChange={(event) => setRole(siteRoleSchema.parse(event.target.value))}
-          className="rounded-md border border-neutral-300 bg-transparent px-2 py-1 dark:border-neutral-700"
-        >
-          <option value="EDITOR">{ROLE_LABELS.EDITOR}</option>
-          <option value="OWNER">{ROLE_LABELS.OWNER}</option>
-        </select>
-      </label>
       <button
         type="submit"
         disabled={pending}
         className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
       >
-        {pending ? "Inviting…" : "Invite"}
+        {pending ? "Adding…" : "Add"}
       </button>
     </form>
   );

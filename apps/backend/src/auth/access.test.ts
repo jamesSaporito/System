@@ -1,5 +1,6 @@
 import { createPrismaClient } from "@portfolio/db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import {
   createTestApp,
   fakeGithub,
@@ -8,31 +9,19 @@ import {
   testEnv,
 } from "../test/support";
 
-const PLATFORM_ADMIN = 2000;
-const OWNER_A = 2001;
-const EDITOR_A = 2002;
-const OWNER_B = 2003;
-const NEWCOMER = 2004;
-const SLUG_PREFIX = "access-test-";
+const ADMIN = 2000;
+const MEMBER = 2001;
+const NEWCOMER = 2002;
+const TEST_GITHUB_IDS = [MEMBER, NEWCOMER].map(String);
 
-const env = testEnv({ ADMIN_GITHUB_IDS: [String(PLATFORM_ADMIN)] });
+const env = testEnv({ ADMIN_GITHUB_IDS: [String(ADMIN)] });
 const prisma = createPrismaClient(env.DATABASE_URL);
 let testApp: TestApp;
-let siteA: string;
-let siteB: string;
 const cookies = new Map<number, string>();
 
 async function cleanUp() {
   await prisma.user.deleteMany({ where: { email: { endsWith: TEST_EMAIL_DOMAIN } } });
-  await prisma.site.deleteMany({ where: { slug: { startsWith: SLUG_PREFIX } } });
-}
-
-/** Invites each GitHub ID to a site, then signs them in so the invite becomes a membership. */
-async function addMember(githubId: number, siteId: string, role: "OWNER" | "EDITOR") {
-  await prisma.siteInvite.create({
-    data: { siteId, githubId: String(githubId), githubLogin: `user${githubId}`, role },
-  });
-  await signIn(githubId);
+  await prisma.member.deleteMany({ where: { githubId: { in: TEST_GITHUB_IDS } } });
 }
 
 async function signIn(githubId: number) {
@@ -48,20 +37,35 @@ function as(githubId: number | null, path: string, init: RequestInit = {}) {
   return testApp.request(path, { ...init, headers });
 }
 
+function addMember(githubLogin: string) {
+  return as(ADMIN, "/members", { method: "POST", body: JSON.stringify({ githubLogin }) });
+}
+
+const membersSchema = z.object({
+  members: z.array(z.object({ id: z.string(), githubLogin: z.string() }).loose()),
+});
+
+async function listMembers() {
+  return membersSchema.parse(await (await as(ADMIN, "/members")).json());
+}
+
+async function memberId(githubLogin: string): Promise<string> {
+  const member = (await listMembers()).members.find((m) => m.githubLogin === githubLogin);
+  if (!member) throw new Error(`${githubLogin} isn't a member`);
+  return member.id;
+}
+
 beforeAll(async () => {
-  fakeGithub({ newcomer: NEWCOMER, user2002: EDITOR_A });
+  fakeGithub({ user2001: MEMBER, newcomer: NEWCOMER });
   testApp = await createTestApp(env);
 });
 
 beforeEach(async () => {
   await cleanUp();
   cookies.clear();
-  siteA = (await prisma.site.create({ data: { slug: `${SLUG_PREFIX}a`, name: "A" } })).id;
-  siteB = (await prisma.site.create({ data: { slug: `${SLUG_PREFIX}b`, name: "B" } })).id;
-  await signIn(PLATFORM_ADMIN);
-  await addMember(OWNER_A, siteA, "OWNER");
-  await addMember(EDITOR_A, siteA, "EDITOR");
-  await addMember(OWNER_B, siteB, "OWNER");
+  await prisma.member.create({ data: { githubId: String(MEMBER), githubLogin: "user2001" } });
+  await signIn(ADMIN);
+  await signIn(MEMBER);
 });
 
 afterAll(async () => {
@@ -71,100 +75,58 @@ afterAll(async () => {
   vi.unstubAllGlobals();
 });
 
-describe("site isolation", () => {
+describe("access", () => {
   it("requires a session", async () => {
     expect((await as(null, "/me")).status).toBe(401);
   });
 
-  it("lists only the sites a member belongs to", async () => {
-    const me = await (await as(EDITOR_A, "/me")).json();
-    expect(me).toMatchObject({ isPlatformAdmin: false, sites: [{ id: siteA, role: "EDITOR" }] });
+  it("tells admins and members apart", async () => {
+    expect(await (await as(ADMIN, "/me")).json()).toMatchObject({ isAdmin: true });
+    expect(await (await as(MEMBER, "/me")).json()).toMatchObject({ isAdmin: false });
   });
 
-  it("hides other sites behind 404s, even from their owners", async () => {
-    expect((await as(OWNER_A, `/sites/${siteB}/members`)).status).toBe(404);
-    expect((await as(EDITOR_A, `/sites/${siteB}/members`)).status).toBe(404);
-    const rename = await as(OWNER_A, `/sites/${siteB}`, {
-      method: "PATCH",
-      body: JSON.stringify({ name: "x" }),
-    });
-    expect(rename.status).toBe(404);
+  it("only lets admins manage members", async () => {
+    const id = await memberId("user2001");
+    expect((await as(MEMBER, "/members")).status).toBe(403);
+    const body = JSON.stringify({ githubLogin: "newcomer" });
+    expect((await as(MEMBER, "/members", { method: "POST", body })).status).toBe(403);
+    expect((await as(MEMBER, `/members/${id}`, { method: "DELETE" })).status).toBe(403);
   });
 
-  it("lets platform admins into every site as an owner", async () => {
-    expect(await (await as(PLATFORM_ADMIN, "/me")).json()).toMatchObject({ isPlatformAdmin: true });
-    expect((await as(PLATFORM_ADMIN, `/sites/${siteB}/members`)).status).toBe(200);
-  });
-});
-
-describe("roles", () => {
-  it("keeps editors out of owner-only routes", async () => {
-    expect((await as(EDITOR_A, `/sites/${siteA}/members`)).status).toBe(403);
-    const rename = await as(EDITOR_A, `/sites/${siteA}`, {
-      method: "PATCH",
-      body: JSON.stringify({ name: "x" }),
-    });
-    expect(rename.status).toBe(403);
-  });
-
-  it("only lets platform admins create sites", async () => {
-    const body = JSON.stringify({ slug: `${SLUG_PREFIX}c`, name: "C" });
-    expect((await as(OWNER_A, "/sites", { method: "POST", body })).status).toBe(403);
-    expect((await as(PLATFORM_ADMIN, "/sites", { method: "POST", body })).status).toBe(201);
-  });
-
-  it("validates request bodies", async () => {
-    const body = JSON.stringify({ slug: "Not A Slug", name: "" });
-    expect((await as(PLATFORM_ADMIN, "/sites", { method: "POST", body })).status).toBe(400);
+  it("refuses a session whose member was removed outside the API", async () => {
+    await prisma.member.deleteMany({ where: { githubId: String(MEMBER) } });
+    expect((await as(MEMBER, "/me")).status).toBe(403);
   });
 });
 
 describe("members", () => {
-  it("lets owners invite by GitHub username, claimed on first sign-in", async () => {
-    const invite = await as(OWNER_A, `/sites/${siteA}/invites`, {
-      method: "POST",
-      body: JSON.stringify({ githubLogin: "newcomer", role: "EDITOR" }),
-    });
-    expect(await invite.json()).toEqual({ status: "invited" });
+  it("lists members, with their profile once they've signed in", async () => {
+    expect((await addMember("newcomer")).status).toBe(201);
 
+    const { members } = await listMembers();
+    expect(members).toMatchObject([
+      { githubLogin: "user2001", user: { name: `User ${MEMBER}` } },
+      { githubLogin: "newcomer", user: null },
+    ]);
+  });
+
+  it("lets added members sign in", async () => {
+    await addMember("newcomer");
     await signIn(NEWCOMER);
-    expect(await (await as(NEWCOMER, "/me")).json()).toMatchObject({
-      sites: [{ id: siteA, role: "EDITOR" }],
-    });
+    expect((await as(NEWCOMER, "/me")).status).toBe(200);
   });
 
-  it("adds existing users directly and rejects unknown GitHub usernames", async () => {
-    const existing = await as(OWNER_B, `/sites/${siteB}/invites`, {
-      method: "POST",
-      body: JSON.stringify({ githubLogin: "user2002", role: "EDITOR" }),
-    });
-    expect(await existing.json()).toEqual({ status: "added" });
-
-    const unknown = await as(OWNER_B, `/sites/${siteB}/invites`, {
-      method: "POST",
-      body: JSON.stringify({ githubLogin: "nobody-here", role: "EDITOR" }),
-    });
-    expect(unknown.status).toBe(400);
+  it("rejects unknown GitHub users and duplicates", async () => {
+    expect((await addMember("nobody-here")).status).toBe(400);
+    expect((await addMember("user2001")).status).toBe(409);
+    expect((await addMember("not a username")).status).toBe(400);
   });
 
-  it("signs people out when they're removed from their last site", async () => {
-    const editor = await prisma.user.findUniqueOrThrow({
-      where: { email: `${EDITOR_A}${TEST_EMAIL_DOMAIN}` },
-    });
-    expect(
-      (await as(OWNER_A, `/sites/${siteA}/members/${editor.id}`, { method: "DELETE" })).status,
-    ).toBe(204);
-    expect((await as(EDITOR_A, "/me")).status).toBe(401);
-  });
+  it("signs removed members out", async () => {
+    const id = await memberId("user2001");
 
-  it("never leaves a site without an owner", async () => {
-    const owner = await prisma.user.findUniqueOrThrow({
-      where: { email: `${OWNER_A}${TEST_EMAIL_DOMAIN}` },
-    });
-    const demote = await as(OWNER_A, `/sites/${siteA}/members/${owner.id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ role: "EDITOR" }),
-    });
-    expect(demote.status).toBe(409);
+    expect((await as(ADMIN, `/members/${id}`, { method: "DELETE" })).status).toBe(204);
+    expect((await as(MEMBER, "/me")).status).toBe(401);
+    expect((await as(ADMIN, `/members/${id}`, { method: "DELETE" })).status).toBe(404);
   });
 });
