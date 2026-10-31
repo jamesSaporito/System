@@ -26,6 +26,86 @@ model Member {
   @@map("members")
 }
 
+// --- Security news briefs (generated daily; read by the admin).
+
+/// Section an item is listed under, in reading order (Postgres sorts enums by declaration
+/// order, so `orderBy: [{ section }, { position }]` yields the brief's order).
+enum SecurityBriefSection {
+  ACTIVELY_EXPLOITED @map("actively_exploited")
+  CRITICAL_AND_HIGH  @map("critical_and_high")
+  WORTH_KNOWING      @map("worth_knowing")
+
+  @@map("security_brief_section")
+}
+
+/// Severity as the brief states it; null on "Worth Knowing" items.
+enum SecuritySeverity {
+  CRITICAL @map("critical")
+  HIGH     @map("high")
+  MEDIUM   @map("medium")
+  LOW      @map("low")
+
+  @@map("security_severity")
+}
+
+/// One daily security news brief. One row per run date: a rerun the same day updates the row
+/// (upsert on run_on) and replaces its items. `markdown` keeps the whole brief as written.
+model SecurityBrief {
+  id         String              @id @default(uuid(7))
+  /// Calendar day the brief ran (the template's "Date" column).
+  runOn      DateTime            @unique @map("run_on") @db.Date
+  /// Window covered, inclusive (the "Covers" column).
+  coversFrom DateTime            @map("covers_from") @db.Date
+  coversTo   DateTime            @map("covers_to") @db.Date
+  /// "<Product> <CVE-ID>: <why>" or "Nothing critical".
+  mostUrgent String              @map("most_urgent")
+  /// The full brief as Markdown, exactly as generated.
+  markdown   String
+  items      SecurityBriefItem[]
+  createdAt  DateTime            @default(now()) @map("created_at")
+  updatedAt  DateTime            @updatedAt @map("updated_at")
+
+  @@map("security_briefs")
+}
+
+/// One entry of a brief: a headed item under "Actively Exploited" / "Critical and High", or a
+/// one-liner under "Worth Knowing" (only product, title, advisoryIds and sources filled).
+/// Items are replaced wholesale when a brief is regenerated, so no updated_at.
+model SecurityBriefItem {
+  id                 String               @id @default(uuid(7))
+  briefId            String               @map("brief_id")
+  brief              SecurityBrief        @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  section            SecurityBriefSection
+  /// 0-based order within the section; items are listed by urgency.
+  position           Int
+  product            String
+  /// What the flaw lets an attacker do; the whole line for "Worth Knowing" items.
+  title              String
+  /// CVE or GHSA ids, e.g. "CVE-2026-12345", "GHSA-xxxx-xxxx-xxxx".
+  advisoryIds        String[]             @default([]) @map("advisory_ids")
+  severity           SecuritySeverity?
+  cvssScore          Float?               @map("cvss_score")
+  /// CVSS version the score is on ("4.0", "3.1"); null when not stated.
+  cvssVersion        String?              @map("cvss_version")
+  /// Prose from the Severity line, e.g. "exploited in the wild since 2026-10-20".
+  exploitationStatus String?              @map("exploitation_status")
+  /// Date it entered CISA's KEV catalog, when the brief says so.
+  kevAddedOn         DateTime?            @map("kev_added_on") @db.Date
+  affected           String?
+  fix                String?
+  publishedOn        DateTime?            @map("published_on") @db.Date
+  whyItMatters       String?              @map("why_it_matters")
+  /// Carried over from the previous brief with a change; update_note says what.
+  isUpdate           Boolean              @default(false) @map("is_update")
+  updateNote         String?              @map("update_note")
+  /// [{ "label": string, "url": string }, ...]; shape enforced by securitySourceSchema.
+  sources            Json
+  createdAt          DateTime             @default(now()) @map("created_at")
+
+  @@unique([briefId, section, position])
+  @@map("security_brief_items")
+}
+
 // --- Better Auth (core). Field names must match what Better Auth expects;
 // it goes through the Prisma client, so only the database names are mapped.
 

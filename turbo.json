@@ -42,7 +42,7 @@
       "dependsOn": ["^typecheck", "db:generate", "^db:generate"]
     },
     "test": {
-      "dependsOn": ["db:generate", "^db:generate", "^db:deploy"],
+      "dependsOn": ["db:generate", "^db:generate", "db:deploy", "^db:deploy"],
       // Tests hit the local database, so results aren't reproducible from inputs alone.
       "cache": false
     },

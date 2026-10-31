@@ -12,6 +12,7 @@
 - Daily security news on the private admin page (from a claude-configuration session; the `security-news` skill stays there too)
   - Something deployed runs it daily: a simple Lambda, or whatever is the cheapest option. Must stay self-hostable in AWS
   - Same search and brief as the skill: `~/Projects/claude-configuration/skills/security-news/SKILL.md`, layout in `assets/template.md`
-  - Store the generated results in a database
+  - Storage is done: `security_briefs` / `security_brief_items` in `packages/db`, validated by `securityBriefInputSchema` in `@portfolio/contracts`
+  - Backend: `POST` that upserts a brief by run date (replacing its items; `position` comes from array order per section) and `GET` list / by date, admin-only
   - Admin page displays them by date, so previous history can be browsed too
   - The admin page is meant as a personal display of things I want to see
