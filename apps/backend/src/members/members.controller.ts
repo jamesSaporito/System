@@ -1,9 +1,11 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from "@nestjs/common";
 import {
   type AddMemberInput,
   addMemberSchema,
   type Member,
   type MembersResponse,
+  type UpdateMemberPermissionsInput,
+  updateMemberPermissionsSchema,
 } from "@portfolio/contracts";
 import { type AuthContext, CurrentAuth, RequireAdmin } from "../auth/access";
 import { MembersService } from "./members.service";
@@ -24,6 +26,14 @@ export class MembersController {
     @Body({ schema: addMemberSchema }) input: AddMemberInput,
   ): Promise<Member> {
     return this.members.add(auth.user.id, input);
+  }
+
+  @Patch(":memberId")
+  updatePermissions(
+    @Param("memberId") memberId: string,
+    @Body({ schema: updateMemberPermissionsSchema }) input: UpdateMemberPermissionsInput,
+  ): Promise<Member> {
+    return this.members.updatePermissions(memberId, input);
   }
 
   @Delete(":memberId")

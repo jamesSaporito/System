@@ -37,8 +37,23 @@ function as(githubId: number | null, path: string, init: RequestInit = {}) {
   return testApp.request(path, { ...init, headers });
 }
 
-function addMember(githubLogin: string) {
-  return as(ADMIN, "/members", { method: "POST", body: JSON.stringify({ githubLogin }) });
+function addMember(githubLogin: string, permissions: string[] = []) {
+  return as(ADMIN, "/members", {
+    method: "POST",
+    body: JSON.stringify({ githubLogin, permissions }),
+  });
+}
+
+/** A request to one of Better Auth's endpoints under /api/auth. */
+function call(githubId: number | null, path: string, method = "GET") {
+  return as(githubId, `/api/auth/${path}`, {
+    method,
+    ...(method === "POST" ? { body: JSON.stringify({ token: "x" }) } : {}),
+  });
+}
+
+function setPermissions(id: string, permissions: string[]) {
+  return as(ADMIN, `/members/${id}`, { method: "PATCH", body: JSON.stringify({ permissions }) });
 }
 
 const membersSchema = z.object({
@@ -96,6 +111,71 @@ describe("access", () => {
   it("refuses a session whose member was removed outside the API", async () => {
     await prisma.member.deleteMany({ where: { githubId: String(MEMBER) } });
     expect((await as(MEMBER, "/me")).status).toBe(403);
+  });
+});
+
+describe("permissions", () => {
+  it("gives admins every tab and new members none", async () => {
+    expect(await (await as(ADMIN, "/me")).json()).toMatchObject({
+      permissions: ["DASHBOARD", "SESSIONS", "SECURITY"],
+    });
+    expect(await (await as(MEMBER, "/me")).json()).toMatchObject({ permissions: [] });
+  });
+
+  it("only lets admins change permissions", async () => {
+    const id = await memberId("user2001");
+    const response = await as(MEMBER, `/members/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ permissions: ["DASHBOARD"] }),
+    });
+    expect(response.status).toBe(403);
+  });
+
+  it("grants and revokes tabs, effective on the next request", async () => {
+    const id = await memberId("user2001");
+
+    const granted = await setPermissions(id, ["DASHBOARD", "SESSIONS", "DASHBOARD"]);
+    expect(granted.status).toBe(200);
+    expect(await granted.json()).toMatchObject({ permissions: ["DASHBOARD", "SESSIONS"] });
+    expect(await (await as(MEMBER, "/me")).json()).toMatchObject({
+      permissions: ["DASHBOARD", "SESSIONS"],
+    });
+
+    await setPermissions(id, []);
+    expect(await (await as(MEMBER, "/me")).json()).toMatchObject({ permissions: [] });
+  });
+
+  it("rejects unknown permissions and members", async () => {
+    const id = await memberId("user2001");
+    expect((await setPermissions(id, ["MEMBERS"])).status).toBe(400);
+    expect((await setPermissions("no-such-member", ["DASHBOARD"])).status).toBe(404);
+  });
+
+  it("starts a new member with the permissions they were added with", async () => {
+    expect((await addMember("newcomer", ["SECURITY"])).status).toBe(201);
+    const { members } = await listMembers();
+    expect(members.find((m) => m.githubLogin === "newcomer")).toMatchObject({
+      permissions: ["SECURITY"],
+    });
+  });
+
+  it("needs the sessions permission to list or revoke sessions", async () => {
+    const id = await memberId("user2001");
+
+    expect((await call(null, "list-sessions")).status).toBe(401);
+    expect((await call(MEMBER, "list-sessions")).status).toBe(403);
+    expect((await call(MEMBER, "revoke-session", "POST")).status).toBe(403);
+    expect((await call(MEMBER, "revoke-other-sessions", "POST")).status).toBe(403);
+
+    await setPermissions(id, ["SESSIONS"]);
+    expect((await call(MEMBER, "list-sessions")).status).toBe(200);
+    expect((await call(ADMIN, "list-sessions")).status).toBe(200);
+  });
+
+  it("still lets members with no tabs sign out", async () => {
+    const response = await as(MEMBER, "/api/auth/sign-out", { method: "POST", body: "{}" });
+    expect(response.status).toBe(200);
+    expect((await as(MEMBER, "/me")).status).toBe(401);
   });
 });
 

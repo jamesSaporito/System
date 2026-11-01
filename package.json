@@ -18,7 +18,8 @@
     "media:push": "turbo run media:push",
     "media:pull": "turbo run media:pull",
     "dev:docker": "docker compose up --build",
-    "preview:docker": "docker compose --profile preview up --build preview"
+    "preview:docker": "docker compose --profile preview up --build preview",
+    "security-brief:docker": "docker compose exec backend pnpm security-brief"
   },
   "devDependencies": {
     "@portfolio/config": "workspace:*",

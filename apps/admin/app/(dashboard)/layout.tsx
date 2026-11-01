@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useMemo } from "react";
 import { api } from "@/lib/api";
 import { authClient } from "@/lib/auth-client";
+import { visibleNav } from "@/lib/tabs";
 import { useResource } from "@/lib/use-resource";
 import { type Workspace, WorkspaceContext } from "@/lib/workspace";
 
@@ -49,9 +50,11 @@ function WorkspaceShell({ children }: { children: ReactNode }) {
     <WorkspaceContext value={workspace}>
       <header className="mb-8 flex flex-wrap items-center gap-4 border-b border-neutral-200 pb-4 dark:border-neutral-800">
         <nav className="flex gap-4">
-          <Link href="/">Dashboard</Link>
-          {workspace.me.isAdmin ? <Link href="/members/">Members</Link> : null}
-          <Link href="/sessions/">Sessions</Link>
+          {visibleNav(workspace.me).map((item) => (
+            <Link key={item.href} href={item.href}>
+              {item.label}
+            </Link>
+          ))}
         </nav>
         <span className="ml-auto text-sm text-neutral-500">{workspace.me.user.name}</span>
         <button type="button" onClick={() => void signOut()} className="text-sm underline">

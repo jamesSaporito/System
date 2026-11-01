@@ -1,8 +1,17 @@
 "use client";
 
+import { RequireAccess } from "@/lib/tabs";
 import { useWorkspace } from "@/lib/workspace";
 
 export default function DashboardPage() {
+  return (
+    <RequireAccess access="DASHBOARD">
+      <Dashboard />
+    </RequireAccess>
+  );
+}
+
+function Dashboard() {
   const { me } = useWorkspace();
 
   return (

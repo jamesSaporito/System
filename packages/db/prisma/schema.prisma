@@ -11,17 +11,29 @@ datasource db {
 // Database naming: plural snake_case tables, snake_case columns, lowercase enum values.
 // Prisma has no global naming setting, so every model, multi-word field, and enum is mapped.
 
+/// An admin tab a member can open. Admins (ADMIN_GITHUB_IDS) hold all of them; managing members
+/// is admin-only and isn't a permission.
+enum Permission {
+  DASHBOARD @map("dashboard")
+  SESSIONS  @map("sessions")
+  SECURITY  @map("security")
+
+  @@map("permission")
+}
+
 /// A GitHub account allowed to sign in to the admin, added by an admin by username. Admins
 /// (ADMIN_GITHUB_IDS) don't need a row. Linked to a User through accounts.account_id once they've
 /// signed in.
 model Member {
-  id          String   @id @default(uuid(7))
+  id          String       @id @default(uuid(7))
   /// Numeric GitHub user ID; matches accounts.account_id.
-  githubId    String   @unique @map("github_id")
-  githubLogin String   @map("github_login")
-  addedById   String?  @map("added_by_id")
-  addedBy     User?    @relation(fields: [addedById], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now()) @map("created_at")
+  githubId    String       @unique @map("github_id")
+  githubLogin String       @map("github_login")
+  /// The tabs this member can open; empty until an admin grants some.
+  permissions Permission[] @default([])
+  addedById   String?      @map("added_by_id")
+  addedBy     User?        @relation(fields: [addedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now()) @map("created_at")
 
   @@map("members")
 }
@@ -48,6 +60,15 @@ enum SecuritySeverity {
   @@map("security_severity")
 }
 
+/// How a daily run ended; "nothing new" stores no brief.
+enum SecurityBriefRunOutcome {
+  STORED      @map("stored")
+  NOTHING_NEW @map("nothing_new")
+  FAILED      @map("failed")
+
+  @@map("security_brief_run_outcome")
+}
+
 /// One daily security news brief. One row per run date: a rerun the same day updates the row
 /// (upsert on run_on) and replaces its items. `markdown` keeps the whole brief as written.
 model SecurityBrief {
@@ -57,7 +78,7 @@ model SecurityBrief {
   /// Window covered, inclusive (the "Covers" column).
   coversFrom DateTime            @map("covers_from") @db.Date
   coversTo   DateTime            @map("covers_to") @db.Date
-  /// "<Product> <CVE-ID>: <why>" or "Nothing critical".
+  /// "<Subject> <CVE-ID>: <why>" or "Nothing critical".
   mostUrgent String              @map("most_urgent")
   /// The full brief as Markdown, exactly as generated.
   markdown   String
@@ -78,7 +99,8 @@ model SecurityBriefItem {
   section            SecurityBriefSection
   /// 0-based order within the section; items are listed by urgency.
   position           Int
-  product            String
+  /// What the item is about: the affected product or project, as its vendor names it.
+  subject            String
   /// What the flaw lets an attacker do; the whole line for "Worth Knowing" items.
   title              String
   /// CVE or GHSA ids, e.g. "CVE-2026-12345", "GHSA-xxxx-xxxx-xxxx".
@@ -94,7 +116,8 @@ model SecurityBriefItem {
   affected           String?
   fix                String?
   publishedOn        DateTime?            @map("published_on") @db.Date
-  whyItMatters       String?              @map("why_it_matters")
+  /// Who is affected and how exposed they are (the brief's "Impact" bullet).
+  impact             String?
   /// Carried over from the previous brief with a change; update_note says what.
   isUpdate           Boolean              @default(false) @map("is_update")
   updateNote         String?              @map("update_note")
@@ -104,6 +127,40 @@ model SecurityBriefItem {
 
   @@unique([briefId, section, position])
   @@map("security_brief_items")
+}
+
+/// One daily run, whatever its outcome: what it cost, and whether today still needs a run.
+model SecurityBriefRun {
+  id        String                  @id @default(uuid(7))
+  /// Calendar day the run was for.
+  runOn     DateTime                @map("run_on") @db.Date
+  outcome   SecurityBriefRunOutcome
+  /// Why it failed; null otherwise.
+  error     String?
+  /// Tokens, searches and fetches used (the Usage type in packages/security-news).
+  usage     Json
+  createdAt DateTime                @default(now()) @map("created_at")
+
+  @@index([runOn])
+  @@map("security_brief_runs")
+}
+
+/// A site the research checks first; with searchBeyondSources off, the only sites it can use.
+model SecurityNewsSource {
+  id        String   @id @default(uuid(7))
+  url       String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("security_news_sources")
+}
+
+/// The research settings: a single row (id 1).
+model SecurityNewsSettings {
+  id                  Int     @id @default(1)
+  /// Whether the research may also search and open sites that aren't listed.
+  searchBeyondSources Boolean @default(true) @map("search_beyond_sources")
+
+  @@map("security_news_settings")
 }
 
 // --- Better Auth (core). Field names must match what Better Auth expects;

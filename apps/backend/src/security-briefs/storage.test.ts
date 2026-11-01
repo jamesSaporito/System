@@ -1,10 +1,15 @@
 import { securityBriefSectionSchema, securitySeveritySchema } from "@portfolio/contracts";
+import {
+  createPrismaClient,
+  Prisma,
+  SecurityBriefRunOutcome,
+  SecurityBriefSection,
+  SecuritySeverity,
+} from "@portfolio/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { createPrismaClient, Prisma, SecurityBriefSection, SecuritySeverity } from "./index";
-
-// Runs against the local database (Turbo migrates it first). Rows use a run date no real brief
-// will have, so cleanup can't touch real data.
+// What SecurityBriefsService relies on from the schema. Runs against the local database (Turbo
+// migrates it first). Rows use a run date no real brief will have, so cleanup can't touch real data.
 const RUN_ON = "1999-01-01";
 const prisma = createPrismaClient(process.env.DATABASE_URL ?? "");
 
@@ -30,14 +35,14 @@ function createBrief() {
           {
             section: "WORTH_KNOWING",
             position: 0,
-            product: "Chrome",
+            subject: "Chrome",
             title: "stable update",
             sources: [{ label: "Chrome", url: "https://example.com/chrome" }],
           },
           {
             section: "CRITICAL_AND_HIGH",
             position: 0,
-            product: "GitLab",
+            subject: "GitLab",
             title: "account takeover",
             advisoryIds: ["CVE-1999-0002"],
             severity: "HIGH",
@@ -46,13 +51,13 @@ function createBrief() {
             affected: "17.x",
             fix: "17.5.1",
             publishedOn: date("1998-12-30"),
-            whyItMatters: "Widely self-hosted.",
+            impact: "Widely self-hosted.",
             sources: [{ label: "GitLab", url: "https://example.com/gitlab" }],
           },
           {
             section: "ACTIVELY_EXPLOITED",
             position: 1,
-            product: "PHP",
+            subject: "PHP",
             title: "second item",
             severity: "CRITICAL",
             sources: [{ label: "PHP", url: "https://example.com/php2" }],
@@ -60,7 +65,7 @@ function createBrief() {
           {
             section: "ACTIVELY_EXPLOITED",
             position: 0,
-            product: "PHP",
+            subject: "PHP",
             title: "unauthenticated RCE",
             advisoryIds: ["CVE-1999-0001", "GHSA-4w2v-q235-vp99"],
             severity: "CRITICAL",
@@ -71,7 +76,7 @@ function createBrief() {
             affected: "8.2 before 8.2.35",
             fix: "8.2.35",
             publishedOn: date("1998-12-26"),
-            whyItMatters: "It's PHP.",
+            impact: "It's PHP.",
             isUpdate: true,
             updateNote: "fix released",
             sources: [{ label: "CISA", url: "https://example.com/cisa" }],
@@ -135,7 +140,7 @@ describe("security briefs", () => {
           briefId: brief.id,
           section: "WORTH_KNOWING",
           position: 0,
-          product: "Firefox",
+          subject: "Firefox",
           title: "duplicate slot",
           sources: [],
         },
@@ -152,5 +157,7 @@ describe("security briefs", () => {
   it("has the same enum values as @portfolio/contracts", () => {
     expect(Object.values(SecurityBriefSection)).toEqual(securityBriefSectionSchema.options);
     expect(Object.values(SecuritySeverity)).toEqual(securitySeveritySchema.options);
+    // Written by SecurityBriefsService.recordRun, which names these values directly.
+    expect(Object.values(SecurityBriefRunOutcome)).toEqual(["STORED", "NOTHING_NEW", "FAILED"]);
   });
 });

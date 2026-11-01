@@ -11,18 +11,18 @@ import {
 
 const headedItem: SecurityBriefItemInput = {
   section: "ACTIVELY_EXPLOITED",
-  product: "PHP",
-  title: "unauthenticated remote code execution",
+  subject: "PHP",
+  title: "Unauthenticated remote code execution",
   advisoryIds: ["CVE-2026-109618", "CVE-2026-109619"],
   severity: "CRITICAL",
   cvssScore: 9.2,
   cvssVersion: "4.0",
-  exploitationStatus: "exploited before the patch shipped",
+  exploitationStatus: "Exploited before the patch shipped",
   kevAddedOn: "2026-10-26",
   affected: "PHP 8.2 before 8.2.35, 8.3 before 8.3.36",
-  fix: "upgrade to 8.2.35 or 8.3.36",
+  fix: "Upgrade to 8.2.35 or 8.3.36",
   publishedOn: "2026-10-21",
-  whyItMatters: "The bug is in PHP itself, so every PHP site is exposed.",
+  impact: "The bug is in PHP itself, so every PHP site is exposed.",
   isUpdate: false,
   updateNote: null,
   sources: [
@@ -33,8 +33,8 @@ const headedItem: SecurityBriefItemInput = {
 
 const worthKnowingItem: SecurityBriefItemInput = {
   section: "WORTH_KNOWING",
-  product: "Chrome",
-  title: "stable channel update fixes three high-severity bugs",
+  subject: "Chrome",
+  title: "Stable channel update fixes three high-severity bugs",
   advisoryIds: [],
   severity: null,
   cvssScore: null,
@@ -44,7 +44,7 @@ const worthKnowingItem: SecurityBriefItemInput = {
   affected: null,
   fix: null,
   publishedOn: null,
-  whyItMatters: null,
+  impact: null,
   isUpdate: false,
   updateNote: null,
   sources: [{ label: "Chrome releases", url: "https://chromereleases.googleblog.com/example" }],
@@ -58,7 +58,7 @@ const brief: SecurityBriefInput = {
   markdown: "# Security News\n\n...",
   items: [
     headedItem,
-    { ...headedItem, section: "CRITICAL_AND_HIGH", product: "GitLab" },
+    { ...headedItem, section: "CRITICAL_AND_HIGH", subject: "GitLab" },
     worthKnowingItem,
   ],
 };
@@ -118,7 +118,11 @@ describe("securityBriefItemInputSchema", () => {
     expect(item.safeParse(worthKnowingItem).success).toBe(true);
   });
 
-  it.each(["severity", "affected", "fix", "publishedOn", "whyItMatters"] as const)(
+  it("allows a headed item with no confirmed published date", () => {
+    expect(item.safeParse({ ...headedItem, publishedOn: null }).success).toBe(true);
+  });
+
+  it.each(["severity", "affected", "fix", "impact"] as const)(
     "requires %s outside Worth Knowing",
     (field) => {
       expect(firstIssuePath({ ...headedItem, [field]: null }, item)).toEqual([field]);
@@ -138,10 +142,28 @@ describe("securityBriefItemInputSchema", () => {
     expect(firstIssuePath({ ...headedItem, severity: "Critical" }, item)).toEqual(["severity"]);
   });
 
+  it.each(["title", "exploitationStatus", "affected", "fix", "impact", "updateNote"] as const)(
+    "requires %s to start with a capital letter",
+    (field) => {
+      expect(firstIssuePath({ ...headedItem, [field]: "lowercase start" }, item)).toEqual([field]);
+    },
+  );
+
+  it("lets the subject keep its own styling, and checks source labels", () => {
+    expect(item.safeParse({ ...headedItem, subject: "npm" }).success).toBe(true);
+    expect(item.safeParse({ ...headedItem, affected: "PHP 8.2" }).success).toBe(true);
+    expect(
+      firstIssuePath(
+        { ...headedItem, sources: [{ label: "vendor", url: "https://example.com" }] },
+        item,
+      ),
+    ).toEqual(["sources", 0, "label"]);
+  });
+
   it("needs an update note when marked as an update", () => {
     expect(firstIssuePath({ ...headedItem, isUpdate: true }, item)).toEqual(["updateNote"]);
     expect(
-      item.safeParse({ ...headedItem, isUpdate: true, updateNote: "fix released" }).success,
+      item.safeParse({ ...headedItem, isUpdate: true, updateNote: "Fix released" }).success,
     ).toBe(true);
   });
 
@@ -159,12 +181,12 @@ describe("securityBriefItemInputSchema", () => {
     expect(firstIssuePath({ ...headedItem, sources: [] }, item)).toEqual(["sources"]);
     expect(
       firstIssuePath(
-        { ...headedItem, sources: [{ label: "x", url: "ftp://example.com/a" }] },
+        { ...headedItem, sources: [{ label: "X", url: "ftp://example.com/a" }] },
         item,
       ),
     ).toEqual(["sources", 0, "url"]);
     expect(
-      firstIssuePath({ ...headedItem, sources: [{ label: "x", url: "not a url" }] }, item),
+      firstIssuePath({ ...headedItem, sources: [{ label: "X", url: "not a url" }] }, item),
     ).toEqual(["sources", 0, "url"]);
     expect(
       firstIssuePath(

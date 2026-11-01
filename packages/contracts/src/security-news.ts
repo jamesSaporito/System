@@ -6,7 +6,7 @@ import { z } from "zod";
 // are strict so a misnamed field fails instead of being dropped.
 //
 // Enum literals match the Prisma enums in packages/db (SecurityBriefSection, SecuritySeverity) so
-// values go to and from the database without a mapping; a db test keeps them in sync.
+// values go to and from the database without a mapping; a backend storage test keeps them in sync.
 
 /** The brief's sections, in reading order. */
 export const securityBriefSectionSchema = z.enum([
@@ -18,6 +18,13 @@ export type SecurityBriefSection = z.infer<typeof securityBriefSectionSchema>;
 
 export const securitySeveritySchema = z.enum(["CRITICAL", "HIGH", "MEDIUM", "LOW"]);
 export type SecuritySeverity = z.infer<typeof securitySeveritySchema>;
+
+/** Readable text, which starts with a capital letter (names styled in lowercase are reworded). */
+export const sentenceSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine((text) => !/^\p{Ll}/u.test(text), "start with a capital letter");
 
 /** A calendar date as YYYY-MM-DD; briefs have no times of day. */
 const calendarDateSchema = z.iso.date();
@@ -32,23 +39,25 @@ export const advisoryIdSchema = z
   );
 
 export const securitySourceSchema = z.strictObject({
-  label: z.string().trim().min(1),
+  label: sentenceSchema,
   url: z.url({ protocol: /^https?$/ }),
 });
 export type SecuritySource = z.infer<typeof securitySourceSchema>;
 
-const HEADED_ITEM_FIELDS = ["severity", "affected", "fix", "publishedOn", "whyItMatters"] as const;
+const HEADED_ITEM_FIELDS = ["severity", "affected", "fix", "impact"] as const;
 
 /**
- * One item of a brief. Everything beyond product, title, advisoryIds and sources is null on
- * "Worth Knowing" items and required on the others.
+ * One item of a brief. Everything beyond subject, title, advisoryIds and sources is null on
+ * "Worth Knowing" items; HEADED_ITEM_FIELDS are required on the others. publishedOn may be null
+ * there too, since the brief says so when an article's date can't be confirmed.
  */
 export const securityBriefItemInputSchema = z
   .strictObject({
     section: securityBriefSectionSchema,
-    product: z.string().trim().min(1),
+    /** What the item is about: the affected product or project, as its vendor names it. */
+    subject: z.string().trim().min(1),
     /** What the flaw lets an attacker do; the whole line for "Worth Knowing" items. */
-    title: z.string().trim().min(1),
+    title: sentenceSchema,
     advisoryIds: z.array(advisoryIdSchema),
     severity: securitySeveritySchema.nullable(),
     cvssScore: z.number().min(0).max(10).nullable(),
@@ -58,16 +67,17 @@ export const securityBriefItemInputSchema = z
       .regex(/^\d\.\d$/, "a CVSS version like 3.1")
       .nullable(),
     /** Prose from the Severity line, e.g. "exploited in the wild since 2026-10-20". */
-    exploitationStatus: z.string().trim().min(1).nullable(),
+    exploitationStatus: sentenceSchema.nullable(),
     /** Date it entered CISA's KEV catalog, when known. */
     kevAddedOn: calendarDateSchema.nullable(),
-    affected: z.string().trim().min(1).nullable(),
-    fix: z.string().trim().min(1).nullable(),
+    affected: sentenceSchema.nullable(),
+    fix: sentenceSchema.nullable(),
     publishedOn: calendarDateSchema.nullable(),
-    whyItMatters: z.string().trim().min(1).nullable(),
+    /** Who is affected and how exposed they are. */
+    impact: sentenceSchema.nullable(),
     /** Carried over from the previous brief with a change; updateNote says what changed. */
     isUpdate: z.boolean(),
-    updateNote: z.string().trim().min(1).nullable(),
+    updateNote: sentenceSchema.nullable(),
     sources: z.array(securitySourceSchema).min(1),
   })
   .superRefine((item, ctx) => {
@@ -99,8 +109,8 @@ export const securityBriefInputSchema = z
     /** Window covered, inclusive. */
     coversFrom: calendarDateSchema,
     coversTo: calendarDateSchema,
-    /** "<Product> <CVE-ID>: <why>" or "Nothing critical". */
-    mostUrgent: z.string().trim().min(1),
+    /** "<Subject> <CVE-ID>: <why>" or "Nothing critical". */
+    mostUrgent: sentenceSchema,
     /** The full brief as Markdown, as written. */
     markdown: z.string().trim().min(1),
     items: z.array(securityBriefItemInputSchema),
@@ -138,7 +148,7 @@ export type SecurityBriefsResponse = { briefs: SecurityBriefSummary[] };
 
 export type SecurityBrief = Omit<SecurityBriefSummary, "itemCount"> & {
   markdown: string;
-  /** Ordered by section (reading order), then position. */
+  /** Ordered by section (reading order), then severity, CVSS score, and position. */
   items: SecurityBriefItem[];
   createdAt: string;
 };

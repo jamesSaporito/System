@@ -6,20 +6,24 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { fromNodeHeaders } from "better-auth/node";
-import { ALLOW_ANONYMOUS, type AuthenticatedRequest, REQUIRE_ADMIN } from "./access";
+import type { Permission } from "@portfolio/contracts";
+import {
+  ALLOW_ANONYMOUS,
+  type AuthenticatedRequest,
+  REQUIRE_ADMIN,
+  REQUIRE_PERMISSION,
+} from "./access";
 import { AccessService } from "./access.service";
-import { AuthService } from "./auth.service";
 
 /**
  * Global guard: every route requires a session from an admin or member unless marked
- * @AllowAnonymous(), plus admin when the route declares @RequireAdmin().
+ * @AllowAnonymous(), plus admin when the route declares @RequireAdmin(), or the permission it
+ * declares with @RequirePermission().
  */
 @Injectable()
 export class SessionGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly authService: AuthService,
     private readonly access: AccessService,
   ) {}
 
@@ -28,19 +32,21 @@ export class SessionGuard implements CanActivate {
     if (this.reflector.getAllAndOverride<boolean>(ALLOW_ANONYMOUS, targets)) return true;
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const session = await this.authService.auth.api.getSession({
-      headers: fromNodeHeaders(request.headers),
-    });
-    if (!session) throw new UnauthorizedException();
+    const result = await this.access.authorize(request.headers);
+    if (!result.ok) {
+      throw result.status === 401 ? new UnauthorizedException() : new ForbiddenException();
+    }
+    const { auth } = result;
+    request.auth = auth;
 
-    // Sign-in already checks this; re-checking covers sessions that outlive a removed member.
-    const { isAdmin, isMember } = await this.access.load(session.user.id);
-    if (!isAdmin && !isMember) throw new ForbiddenException();
-    request.auth = { ...session, isAdmin };
-
-    if (this.reflector.getAllAndOverride<boolean>(REQUIRE_ADMIN, targets) && !isAdmin) {
+    if (this.reflector.getAllAndOverride<boolean>(REQUIRE_ADMIN, targets) && !auth.isAdmin) {
       throw new ForbiddenException();
     }
+    const permission = this.reflector.getAllAndOverride<Permission | undefined>(
+      REQUIRE_PERMISSION,
+      targets,
+    );
+    if (permission && !auth.permissions.includes(permission)) throw new ForbiddenException();
     return true;
   }
 }

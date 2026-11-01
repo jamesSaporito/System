@@ -4,9 +4,15 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import type { AddMemberInput, Member, MembersResponse } from "@portfolio/contracts";
+import type {
+  AddMemberInput,
+  Member,
+  MembersResponse,
+  Permission,
+  UpdateMemberPermissionsInput,
+} from "@portfolio/contracts";
 import { AccessService } from "../auth/access.service";
-import { isUniqueViolation } from "../prisma/errors";
+import { isNotFound, isUniqueViolation } from "../prisma/errors";
 import { PrismaService } from "../prisma/prisma.service";
 import { findGithubUser } from "./github";
 
@@ -28,8 +34,8 @@ export class MembersService {
     });
     const users = new Map(accounts.map(({ accountId, user }) => [accountId, user]));
     return {
-      members: members.map(({ id, githubId, githubLogin, createdAt }) =>
-        toMember({ id, githubLogin, createdAt, user: users.get(githubId) ?? null }),
+      members: members.map((member) =>
+        toMember({ ...member, user: users.get(member.githubId) ?? null }),
       ),
     };
   }
@@ -42,7 +48,12 @@ export class MembersService {
 
     try {
       const member = await this.prisma.client.member.create({
-        data: { githubId: githubUser.id, githubLogin: githubUser.login, addedById },
+        data: {
+          githubId: githubUser.id,
+          githubLogin: githubUser.login,
+          permissions: input.permissions,
+          addedById,
+        },
       });
       const account = await this.prisma.client.account.findFirst({
         where: { providerId: GITHUB, accountId: githubUser.id },
@@ -54,6 +65,24 @@ export class MembersService {
         throw new ConflictException(`${githubUser.login} is already a member`);
       throw error;
     }
+  }
+
+  /** Takes effect on their next request; the guard reads permissions on every call. */
+  async updatePermissions(
+    memberId: string,
+    { permissions }: UpdateMemberPermissionsInput,
+  ): Promise<Member> {
+    const member = await this.prisma.client.member
+      .update({ where: { id: memberId }, data: { permissions } })
+      .catch((error: unknown) => {
+        if (isNotFound(error)) throw new NotFoundException();
+        throw error;
+      });
+    const account = await this.prisma.client.account.findFirst({
+      where: { providerId: GITHUB, accountId: member.githubId },
+      select: { user: { select: { name: true, image: true } } },
+    });
+    return toMember({ ...member, user: account?.user ?? null });
   }
 
   /** Also signs them out everywhere (they can't sign back in), unless they're an admin. */
@@ -72,13 +101,15 @@ export class MembersService {
 function toMember({
   id,
   githubLogin,
+  permissions,
   createdAt,
   user,
 }: {
   id: string;
   githubLogin: string;
+  permissions: Permission[];
   createdAt: Date;
   user: { name: string; image: string | null } | null;
 }): Member {
-  return { id, githubLogin, createdAt: createdAt.toISOString(), user };
+  return { id, githubLogin, permissions, createdAt: createdAt.toISOString(), user };
 }

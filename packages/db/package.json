@@ -12,8 +12,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:migrate": "pnpm db:up && prisma migrate dev",
     "lint": "oxlint --type-aware",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@prisma/adapter-pg": "7.10.0",
@@ -21,10 +20,8 @@
   },
   "devDependencies": {
     "@portfolio/config": "workspace:*",
-    "@portfolio/contracts": "workspace:*",
     "@types/node": "24.19.2",
     "prisma": "7.10.0",
-    "typescript": "7.0.2",
-    "vitest": "5.0.3"
+    "typescript": "7.0.2"
   }
 }

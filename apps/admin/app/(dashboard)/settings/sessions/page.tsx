@@ -1,6 +1,7 @@
 "use client";
 
 import { authClient } from "@/lib/auth-client";
+import { RequireAccess } from "@/lib/tabs";
 import { useResource } from "@/lib/use-resource";
 
 async function listSessions() {
@@ -11,6 +12,14 @@ async function listSessions() {
 
 /** Your own signed-in devices. Revoking one signs that browser out. */
 export default function SessionsPage() {
+  return (
+    <RequireAccess access="SESSIONS">
+      <Sessions />
+    </RequireAccess>
+  );
+}
+
+function Sessions() {
   const { data: current } = authClient.useSession();
   const { state, reload } = useResource(listSessions);
 

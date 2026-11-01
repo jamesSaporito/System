@@ -1,16 +1,47 @@
 "use client";
 
-import type { Member, MembersResponse } from "@portfolio/contracts";
+import {
+  type Member,
+  type MembersResponse,
+  PERMISSION_PRESET_NAMES,
+  PERMISSION_PRESETS,
+  PERMISSIONS,
+  type Permission,
+  type PermissionPreset,
+} from "@portfolio/contracts";
 import Image from "next/image";
 import { type FormEvent, useCallback, useState } from "react";
 import { api, describeError } from "@/lib/api";
 import { useResource } from "@/lib/use-resource";
-import { useWorkspace } from "@/lib/workspace";
+import { RequireAccess } from "@/lib/tabs";
+
+const PERMISSION_LABELS: Record<Permission, string> = {
+  DASHBOARD: "Dashboard",
+  SESSIONS: "Sessions",
+  SECURITY: "Vulnerability Report",
+};
+
+const PRESET_LABELS: Record<PermissionPreset, string> = {
+  none: "No access",
+  viewer: "Viewer",
+  full: "Full access",
+};
+
+/** The preset whose permissions match exactly, if any. */
+function matchingPreset(permissions: readonly Permission[]): PermissionPreset | "custom" {
+  const match = PERMISSION_PRESET_NAMES.find((name) => {
+    const preset = PERMISSION_PRESETS[name];
+    return preset.length === permissions.length && preset.every((p) => permissions.includes(p));
+  });
+  return match ?? "custom";
+}
 
 export default function MembersPage() {
-  const { me } = useWorkspace();
-  if (!me.isAdmin) return <p className="text-neutral-500">Only admins can manage members.</p>;
-  return <Members />;
+  return (
+    <RequireAccess access="admin">
+      <Members />
+    </RequireAccess>
+  );
 }
 
 function Members() {
@@ -49,7 +80,7 @@ function Members() {
           mutate(async () => {
             const member = await api<Member>("/members", {
               method: "POST",
-              body: JSON.stringify({ githubLogin }),
+              body: JSON.stringify({ githubLogin, permissions: PERMISSION_PRESETS.viewer }),
             });
             setNotice({ kind: "info", text: `Added ${member.githubLogin}.` });
           })
@@ -86,6 +117,17 @@ function Members() {
                   @{member.githubLogin}
                   {member.user ? null : " · hasn't signed in yet"}
                 </span>
+                <PermissionsEditor
+                  permissions={member.permissions}
+                  onChange={(permissions) =>
+                    void mutate(() =>
+                      api(`/members/${member.id}`, {
+                        method: "PATCH",
+                        body: JSON.stringify({ permissions }),
+                      }),
+                    )
+                  }
+                />
                 <button
                   type="button"
                   onClick={() => {
@@ -103,6 +145,59 @@ function Members() {
         )
       ) : null}
     </>
+  );
+}
+
+/** A preset to start from, then the tabs themselves. Only the checked tabs are saved. */
+function PermissionsEditor({
+  permissions,
+  onChange,
+}: {
+  permissions: Permission[];
+  onChange: (permissions: Permission[]) => void;
+}) {
+  const preset = matchingPreset(permissions);
+  return (
+    <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+      <label className="flex items-center gap-2">
+        Access
+        <select
+          value={preset}
+          onChange={(event) => {
+            const name = PERMISSION_PRESET_NAMES.find((n) => n === event.target.value);
+            if (name) onChange([...PERMISSION_PRESETS[name]]);
+          }}
+          className="rounded-md border border-neutral-300 bg-transparent px-2 py-1 dark:border-neutral-700"
+        >
+          {PERMISSION_PRESET_NAMES.map((name) => (
+            <option key={name} value={name} className="text-neutral-900">
+              {PRESET_LABELS[name]}
+            </option>
+          ))}
+          {preset === "custom" ? (
+            <option value="custom" className="text-neutral-900">
+              Custom
+            </option>
+          ) : null}
+        </select>
+      </label>
+      {PERMISSIONS.map((permission) => (
+        <label key={permission} className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={permissions.includes(permission)}
+            onChange={(event) =>
+              onChange(
+                event.target.checked
+                  ? [...permissions, permission]
+                  : permissions.filter((p) => p !== permission),
+              )
+            }
+          />
+          {PERMISSION_LABELS[permission]}
+        </label>
+      ))}
+    </div>
   );
 }
 

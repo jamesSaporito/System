@@ -5,7 +5,7 @@ description: Builds the portfolio's production static export and serves it with 
 
 # Production preview
 
-The `preview` Compose service (profile `preview`, `docker/Dockerfile` target `preview`) builds `apps/portfolio` as a static export and serves it with `docker/nginx.conf.template`: clean URLs, `404.html` for unknown paths, and `/media/` from the `portfolio` bucket in s3mock. See the preview section of `README.md`. It doesn't watch files, so every run rebuilds.
+The `preview` Compose service (profile `preview`, `docker/Dockerfile` target `preview`) builds `apps/portfolio` as a static export and serves it with `docker/nginx.conf.template`: clean URLs, `404.html` for unknown paths, and `/media/` from the `portfolio` bucket in s3. See the preview section of `README.md`. It doesn't watch files, so every run rebuilds.
 
 ## 1. Check the port
 
@@ -31,7 +31,7 @@ find apps/portfolio/app -name page.tsx | sed 's#^apps/portfolio/app##; s#page\.t
 done
 ```
 
-A 404 on `/media/...` usually means the photos aren't in s3mock yet (`pnpm media:push` from `apps/portfolio`; inside the dev container add `-e S3_ENDPOINT=http://s3mock:9090`).
+A 404 on `/media/...` usually means the photos aren't in s3 yet (`pnpm media:push` from `apps/portfolio`; inside the dev container add `-e S3_ENDPOINT=http://s3:9090`).
 
 ## 4. Report
 

@@ -11,6 +11,7 @@ apps/backend        NestJS API + Better Auth (bundled with tsdown)
 packages/db         Prisma schema, migrations, and client
 packages/contracts  Zod schemas and types shared by apps
 packages/media      `portfolio-media` CLI that syncs the portfolio photos with S3
+packages/security-news  Writes the daily security brief with the Anthropic API (run by the backend)
 packages/ui         Shared React components
 packages/config     Shared tsconfig, oxlint, and Prettier presets
 infra/              Terraform (planned)
@@ -36,7 +37,7 @@ Then fill in `.env`:
 
 ## Docker (recommended)
 
-One command starts everything: Postgres, s3mock, the backend (after applying migrations), admin, and the portfolio, all with hot reload.
+One command starts everything: Postgres, s3, the backend (after applying migrations), admin, and the portfolio, all with hot reload.
 
 ```sh
 pnpm dev:docker       # portfolio :3000, admin :3001, backend :4000
@@ -47,11 +48,11 @@ These wrap `docker compose up --build` and `docker compose --profile preview up 
 
 The `install` service runs `pnpm install` once before the app services start. After changing dependencies, rerun `pnpm dev:docker`. To reset container installs and data: `docker compose down -v`.
 
-The preview service mirrors CloudFront: clean URLs resolve to `index.html`, unknown paths return `404.html`, and `/media/` is served from the site's bucket in s3mock.
+The preview service mirrors CloudFront: clean URLs resolve to `index.html`, unknown paths return `404.html`, and `/media/` is served from the site's bucket in s3.
 
 ## Native
 
-Apps run on your machine; Postgres and s3mock still run in Docker and are started automatically by any task that needs them.
+Apps run on your machine; Postgres and s3 still run in Docker and are started automatically by any task that needs them.
 
 ```sh
 pnpm install
@@ -67,7 +68,7 @@ pnpm typecheck
 pnpm format
 ```
 
-Task ordering lives in `turbo.json`: `@portfolio/db` owns `db:up` (start Postgres), `db:deploy` (apply migrations), and the backend's `dev` and `test` depend on them; the portfolio's `media:up` starts s3mock before its `dev`. Run `turbo` from inside a package folder to scope it to that package.
+Task ordering lives in `turbo.json`: `@portfolio/db` owns `db:up` (start Postgres), `db:deploy` (apply migrations), and the backend's `dev` and `test` depend on them; the portfolio's `media:up` starts s3 before its `dev`. Run `turbo` from inside a package folder to scope it to that package.
 
 To browse the local database (e.g. in TablePlus), connect to `postgresql://portfolio:portfolio@localhost:5432/portfolio` (host `localhost`, port `5432`, user and password `portfolio`, database `portfolio`) while Postgres is running.
 
@@ -83,10 +84,23 @@ cwebp -q 80 -resize 2200 0 -metadata none media-originals/motorcycle/hero.jpeg -
 
 `pnpm media:push` uploads new or changed files to the `media/` prefix of the site's bucket, and `pnpm media:pull` downloads anything you don't have locally (new machine, or after a teammate's push).
 
-- Locally the bucket is `portfolio` in [s3mock](https://github.com/adobe/S3Mock), and `next dev` loads photos from it (`apps/portfolio/.env.development`).
+- Locally the bucket is `portfolio` in [SeaweedFS](https://github.com/seaweedfs/seaweedfs), and `next dev` loads photos from it (`apps/portfolio/.env.development`).
 - In production CloudFront serves them from the site's own domain at `/media/`. To upload to production, run `pnpm media:push:prod` from `apps/portfolio` with `AWS_PROFILE` set; it sets `S3_ENDPOINT=` (empty, meaning real AWS) and `MEDIA_BUCKET` to the site's bucket. Deploys never touch `media/`, so photos can go up before or after a deploy.
 
 ## Admin access
 
-- **Admins** (`ADMIN_GITHUB_IDS`) can always sign in, and add or remove members on the admin's Members page.
-- **Members** are added by GitHub username and can sign in from then on, whether or not they've signed in before. Removing a member signs them out and blocks future sign-ins.
+- **Admins** (`ADMIN_GITHUB_IDS`) can always sign in, hold every permission, and add or remove members and choose which tabs each can open on the admin's Members page.
+- **Members** are added by GitHub username and can sign in from then on, whether or not they've signed in before. New members start with the Dashboard tab; an admin can pick a preset (no access, viewer, full access) or tick tabs individually, and changes apply on their next request. Removing a member signs them out and blocks future sign-ins.
+
+## Daily security brief
+
+`packages/security-news` writes the daily security news brief that the admin's Vulnerability Report tab shows. It is the `security-news` skill's instructions run through the Anthropic API instead of Claude Code: Claude Opus 5.5 searches the web and opens articles with Anthropic's server-side web search and fetch tools, writes the brief in the skill's layout, and a second, small request turns it into the data stored in `security_briefs`. It stores nothing if web search returned nothing, if the brief links a page the research never saw, or if nothing is new since the previous brief.
+
+Which sites it uses is set in the admin, under Vulnerability Report → Manage sources (admins only): a list of site URLs it searches and reads first, and a toggle for whether it may also use other sites (vendor advisories, CVE records, other news). With the toggle off, web search and fetch are limited to the listed sites' domains. Every run, including failed and nothing-new ones, is logged with what it used in `security_brief_runs`.
+
+The backend runs it, in the same process and against the same database (no separate job or Lambda):
+
+- Set `ANTHROPIC_API_KEY` in `.env` to let an admin start a run: `POST /security-briefs/run` (admin session required). It returns `202` straight away, since a run takes minutes; the brief appears in `GET /security-briefs` when it is stored, and the outcome (items, tokens and searches used, which is what a run costs) is logged as one JSON line. A rerun on the same day replaces that day's brief.
+- To run it from a terminal instead (no session needed), with the stack up: `pnpm security-brief:docker`. It waits for the run, logs the same JSON line, and exits non-zero unless it stored a brief or found nothing new.
+- Set `SECURITY_NEWS_SCHEDULE=true` as well and the backend writes the brief by itself every day at 12:00 UTC, and at startup if that time has passed and today hasn't had a run that stored a brief or found nothing new (so a restart or deploy can't skip a day or repeat one; a failed run is tried again). It is off by default so a development stack never spends money; production sets it to `true`.
+- It assumes a single always-on backend instance. With more than one, each would start the scheduled run, so add a database lock first.

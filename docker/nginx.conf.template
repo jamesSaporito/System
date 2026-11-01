@@ -15,7 +15,7 @@ server {
     }
 
     location /media/ {
-        proxy_pass http://s3mock:9090/portfolio/media/;
+        proxy_pass http://s3:9090/portfolio/media/;
         # Missing photos get the site's 404 page, like CloudFront's custom error response.
         proxy_intercept_errors on;
     }

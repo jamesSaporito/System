@@ -7,6 +7,10 @@ export class MeController {
   @Get()
   me(@CurrentAuth() auth: AuthContext): MeResponse {
     const { id, name, email, image } = auth.user;
-    return { user: { id, name, email, image: image ?? null }, isAdmin: auth.isAdmin };
+    return {
+      user: { id, name, email, image: image ?? null },
+      isAdmin: auth.isAdmin,
+      permissions: auth.permissions,
+    };
   }
 }

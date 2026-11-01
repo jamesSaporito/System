@@ -29,7 +29,8 @@ RUN apk add --no-cache libwebp-tools~1.6.0
 RUN mkdir -p node_modules apps/admin/node_modules apps/admin/.next apps/backend/node_modules \
       apps/portfolio/node_modules apps/portfolio/.next \
       packages/ui/node_modules packages/config/node_modules packages/contracts/node_modules \
-      packages/db/node_modules packages/media/node_modules /home/node/.local/share/pnpm \
+      packages/db/node_modules packages/media/node_modules packages/security-news/node_modules \
+      /home/node/.local/share/pnpm \
     && chown -R node:node /app /home/node/.local
 USER node
 EXPOSE 3000 3001 4000
