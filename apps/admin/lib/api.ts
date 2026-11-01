@@ -19,7 +19,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     credentials: "include",
   });
   if (!response.ok) throw new ApiError(response.status, await errorMessage(response));
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- shapes come from @portfolio/contracts
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- shapes come from the packages' "./api" exports
   return (response.status === 204 ? undefined : await response.json()) as T;
 }
 

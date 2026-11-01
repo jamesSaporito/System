@@ -1,6 +1,6 @@
 "use client";
 
-import type { MeResponse } from "@portfolio/contracts";
+import type { MeResponse } from "@portfolio/access/api";
 import { createContext, use } from "react";
 
 export type Workspace = {

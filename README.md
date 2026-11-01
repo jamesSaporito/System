@@ -7,11 +7,12 @@ My portfolio (`apps/portfolio`), a static Next.js export on jamessaporito.com (S
 ```
 apps/portfolio      The portfolio site (static export, jamessaporito.com)
 apps/admin          Personal admin UI for members (static export, GitHub sign-in)
-apps/backend        NestJS API + Better Auth (bundled with tsdown)
+apps/backend        NestJS API: thin adapters wiring the feature packages to HTTP (bundled with tsdown)
+packages/access     Sign-in (Better Auth), permissions, members, health: logic and API shapes
+packages/security-brief  The daily security brief: feeds, writing, storage, runner, API shapes
+packages/ai         Reusable Anthropic API client (structured output, validation and retry)
 packages/db         Prisma schema, migrations, and client
-packages/contracts  Zod schemas and types shared by apps
 packages/media      `portfolio-media` CLI that syncs the portfolio photos with S3
-packages/security-news  Writes the daily security brief with the Anthropic API (run by the backend)
 packages/ui         Shared React components
 packages/config     Shared tsconfig, oxlint, and Prettier presets
 infra/              Terraform (planned)
@@ -94,13 +95,19 @@ cwebp -q 80 -resize 2200 0 -metadata none media-originals/motorcycle/hero.jpeg -
 
 ## Daily security brief
 
-`packages/security-news` writes the daily security news brief that the admin's Vulnerability Report tab shows. It is the `security-news` skill's instructions run through the Anthropic API instead of Claude Code: Claude Opus 5.5 searches the web and opens articles with Anthropic's server-side web search and fetch tools, writes the brief in the skill's layout, and a second, small request turns it into the data stored in `security_briefs`. It stores nothing if web search returned nothing, if the brief links a page the research never saw, or if nothing is new since the previous brief.
+`packages/security-brief` writes the daily security news brief that the admin's Vulnerability Report tab shows. Code decides everything except the wording, so the same feed entries always give the same items and none is dropped:
 
-Which sites it uses is set in the admin, under Vulnerability Report → Manage sources (admins only): a list of site URLs it searches and reads first, and a toggle for whether it may also use other sites (vendor advisories, CVE records, other news). With the toggle off, web search and fetch are limited to the listed sites' domains. Every run, including failed and nothing-new ones, is logged with what it used in `security_brief_runs`.
+1. **Read.** The backend reads [CISA's KEV catalog](https://github.com/cisagov/kev-data) (vulnerabilities known to be exploited, from CISA's GitHub copy), GitHub's reviewed critical and high advisories (`api.github.com/advisories`, every page) and the security news RSS/Atom feeds listed under Vulnerability Report → Manage feeds (admins only). Each source adds at most 10 entries per run (`MAX_ENTRIES_PER_SOURCE` in `src/feeds/feeds.ts`): each feed's newest security articles, KEV's newest additions, and GitHub's critical advisories before high ones, newest first. The rest are skipped, not saved for later, which also bounds what a run catching up after a long gap costs. Each source is read from where its last successful read started, less an hour (`security_news_settings` for KEV and GitHub, `security_news_feeds.fetched_at` for each feed); a source's first read covers the last 24 hours. A source that fails keeps its place, so the next run catches up. The backend needs to reach `raw.githubusercontent.com`, `api.github.com` and each feed's host.
+2. **Store.** Every entry is stored in `security_feed_entries`, once: it's unique by source and id (the CVE, the GHSA id, or the article's URL), so reading it again adds nothing. Entries wait there (`item_id` null) until they're written into an item, across failed runs too.
+3. **Group.** Waiting KEV entries and advisories that share a CVE or GHSA id are one issue. An article joins the first issue whose CVE it mentions, otherwise it's an issue of its own. An issue that shares an id with an item already written is an update of that item.
+4. **Write.** Claude Opus 5.5 writes only those issues' text (subject, title, exploitation, affected, fix, impact, and whether an entry says it's exploited in the wild), up to 40 issues per request, with structured output. Every issue must come back; a missing one gets one retry, then the run fails and its entries keep waiting. When nothing is waiting, the model isn't called.
+5. **Fill in.** Code sets the rest: the section (in KEV or exploited → Actively Exploited; a GitHub advisory → Critical and High; news only → Worth Knowing), severity and CVSS from GitHub, dates, the links (one per entry), and for an update, the day and a note ("Added to CISA KEV", "New article: …"). An item is listed on the day it was first seen, and on the latest day it was updated, marked as an update.
+
+Every run, including failed and nothing-new ones, is logged in `security_brief_runs` with what it cost, the new entries, items and updates it made, and the feeds that failed. The run fails, without calling the model, if neither KEV nor GitHub can be read.
 
 The backend runs it, in the same process and against the same database (no separate job or Lambda):
 
-- Set `ANTHROPIC_API_KEY` in `.env` to let an admin start a run: `POST /security-briefs/run` (admin session required). It returns `202` straight away, since a run takes minutes; the brief appears in `GET /security-briefs` when it is stored, and the outcome (items, tokens and searches used, which is what a run costs) is logged as one JSON line. A rerun on the same day replaces that day's brief.
-- To run it from a terminal instead (no session needed), with the stack up: `pnpm security-brief:docker`. It waits for the run, logs the same JSON line, and exits non-zero unless it stored a brief or found nothing new.
-- Set `SECURITY_NEWS_SCHEDULE=true` as well and the backend writes the brief by itself every day at 12:00 UTC, and at startup if that time has passed and today hasn't had a run that stored a brief or found nothing new (so a restart or deploy can't skip a day or repeat one; a failed run is tried again). It is off by default so a development stack never spends money; production sets it to `true`.
+- Set `ANTHROPIC_API_KEY` in `.env` to let an admin start a run with the **Run now** button on the Vulnerability Report page (it asks you to type `yes` first), which calls `POST /security-briefs/run` (admin session required). It returns `202` straight away, since a run can take minutes, and the outcome (counts and tokens used, which is what a run costs) is logged as one JSON line. A rerun only sends entries that weren't written yet, so one with nothing new costs nothing. `GET /security-briefs` lists the days with items, and `GET /security-briefs/:day` a day's items (the `SECURITY` tab permission).
+- `GET /security-briefs/status` (admins only) says whether a run is going and how the last one ended (from `security_brief_runs`, with the reason if it failed). The page polls it while a run is going and shows the same, scheduled runs included.
+- Set `SECURITY_NEWS_SCHEDULE=true` as well and the backend writes the brief by itself every day at 12:00 UTC, and at startup if that time has passed and today hasn't had a run that stored items or found nothing new (so a restart or deploy can't skip a day or repeat one; a failed run is tried again). It is off by default so a development stack never spends money; production sets it to `true`.
 - It assumes a single always-on backend instance. With more than one, each would start the scheduled run, so add a database lock first.

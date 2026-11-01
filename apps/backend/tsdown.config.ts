@@ -1,7 +1,7 @@
 import { defineConfig } from "tsdown";
 
 export default defineConfig({
-  entry: ["src/main.ts", "src/security-brief.ts"],
+  entry: ["src/main.ts"],
   platform: "node",
   format: "esm",
   sourcemap: true,

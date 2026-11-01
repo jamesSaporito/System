@@ -4,9 +4,9 @@ import { vi } from "vitest";
 import { z } from "zod";
 import { configureApp } from "../app";
 import { AppModule } from "../app.module";
-import type { ModelApi } from "@portfolio/security-news";
+import type { FetchLike, ModelApi } from "@portfolio/security-brief";
 import { ENV, type Env } from "../env";
-import { CLOCK, MODEL_API } from "../security-briefs/security-news.service";
+import { CLOCK, FEED_FETCH, MODEL_API } from "../security-brief/security-brief.module";
 
 export const ADMIN_URL = "http://localhost:3001";
 
@@ -44,7 +44,11 @@ export type TestAppOptions = {
   model?: ModelApi;
   /** The time the app sees; the security brief is written for its date. */
   now?: () => Date;
+  /** Serves the feeds method's requests; by default every request fails, so no test goes online. */
+  feedFetch?: FetchLike;
 };
+
+const offline: FetchLike = (url) => Promise.reject(new Error(`No network in tests: ${url}`));
 
 export async function createTestApp(env: Env, options: TestAppOptions = {}): Promise<TestApp> {
   let builder = Test.createTestingModule({ imports: [AppModule] })
@@ -52,6 +56,7 @@ export async function createTestApp(env: Env, options: TestAppOptions = {}): Pro
     .useValue(env);
   if (options.model) builder = builder.overrideProvider(MODEL_API).useValue(options.model);
   if (options.now) builder = builder.overrideProvider(CLOCK).useValue(options.now);
+  builder = builder.overrideProvider(FEED_FETCH).useValue(options.feedFetch ?? offline);
   const moduleRef = await builder.compile();
   const app = configureApp(
     moduleRef.createNestApplication<NestExpressApplication>({ bodyParser: false, logger: false }),

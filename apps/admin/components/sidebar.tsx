@@ -1,6 +1,6 @@
 "use client";
 
-import type { MeResponse } from "@portfolio/contracts";
+import type { MeResponse } from "@portfolio/access/api";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";

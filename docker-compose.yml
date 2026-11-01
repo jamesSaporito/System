@@ -14,10 +14,11 @@ x-dev: &dev
     - admin_node_modules:/app/apps/admin/node_modules
     - admin_next:/app/apps/admin/.next
     - backend_node_modules:/app/apps/backend/node_modules
-    - security_news_node_modules:/app/packages/security-news/node_modules
+    - security_brief_node_modules:/app/packages/security-brief/node_modules
+    - access_node_modules:/app/packages/access/node_modules
+    - ai_node_modules:/app/packages/ai/node_modules
     - ui_node_modules:/app/packages/ui/node_modules
     - config_node_modules:/app/packages/config/node_modules
-    - contracts_node_modules:/app/packages/contracts/node_modules
     - db_node_modules:/app/packages/db/node_modules
     - media_node_modules:/app/packages/media/node_modules
     - pnpm_store:/home/node/.local/share/pnpm
@@ -119,10 +120,11 @@ volumes:
   admin_node_modules:
   admin_next:
   backend_node_modules:
-  security_news_node_modules:
+  security_brief_node_modules:
+  access_node_modules:
+  ai_node_modules:
   ui_node_modules:
   config_node_modules:
-  contracts_node_modules:
   db_node_modules:
   media_node_modules:
   pnpm_store:

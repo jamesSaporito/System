@@ -1,6 +1,6 @@
 "use client";
 
-import type { MeResponse, Permission } from "@portfolio/contracts";
+import type { MeResponse, Permission } from "@portfolio/access/api";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect } from "react";
 import {

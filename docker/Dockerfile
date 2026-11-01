@@ -28,8 +28,8 @@ RUN apk add --no-cache libwebp-tools~1.6.0
 # Pre-create mount points owned by `node` so named volumes inherit that ownership.
 RUN mkdir -p node_modules apps/admin/node_modules apps/admin/.next apps/backend/node_modules \
       apps/portfolio/node_modules apps/portfolio/.next \
-      packages/ui/node_modules packages/config/node_modules packages/contracts/node_modules \
-      packages/db/node_modules packages/media/node_modules packages/security-news/node_modules \
+      packages/ui/node_modules packages/config/node_modules packages/access/node_modules packages/ai/node_modules \
+      packages/db/node_modules packages/media/node_modules packages/security-brief/node_modules \
       /home/node/.local/share/pnpm \
     && chown -R node:node /app /home/node/.local
 USER node

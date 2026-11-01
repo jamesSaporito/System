@@ -8,7 +8,7 @@ import {
   PERMISSIONS,
   type Permission,
   type PermissionPreset,
-} from "@portfolio/contracts";
+} from "@portfolio/access/api";
 import Image from "next/image";
 import { type FormEvent, useCallback, useState } from "react";
 import { api, describeError } from "@/lib/api";

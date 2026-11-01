@@ -184,9 +184,12 @@ importers:
 
   apps/admin:
     dependencies:
-      '@portfolio/contracts':
+      '@portfolio/access':
         specifier: workspace:*
-        version: link:../../packages/contracts
+        version: link:../../packages/access
+      '@portfolio/security-brief':
+        specifier: workspace:*
+        version: link:../../packages/security-brief
       '@portfolio/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -245,15 +248,15 @@ importers:
       '@nestjs/schedule':
         specifier: 12.0.2
         version: 12.0.2(@nestjs/common@12.1.2(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.1.2)
-      '@portfolio/contracts':
+      '@portfolio/access':
         specifier: workspace:*
-        version: link:../../packages/contracts
+        version: link:../../packages/access
       '@portfolio/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@portfolio/security-news':
+      '@portfolio/security-brief':
         specifier: workspace:*
-        version: link:../../packages/security-news
+        version: link:../../packages/security-brief
       better-auth:
         specifier: 1.7.7
         version: 1.7.7(@opentelemetry/api@1.10.0)(@prisma/client@7.10.0(prisma@7.10.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.15.3)(next@16.4.2(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(pg@8.23.1)(prisma@7.10.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@7.0.2))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.1)))
@@ -332,10 +335,14 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
-  packages/config: {}
-
-  packages/contracts:
+  packages/access:
     dependencies:
+      '@portfolio/db':
+        specifier: workspace:*
+        version: link:../db
+      better-auth:
+        specifier: 1.7.7
+        version: 1.7.7(@opentelemetry/api@1.10.0)(@prisma/client@7.10.0(prisma@7.10.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@7.0.2))(typescript@7.0.2))(mysql2@3.15.3)(next@16.4.2(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(pg@8.23.1)(prisma@7.10.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@7.0.2))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(vitest@5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.1)))
       zod:
         specifier: 4.6.5
         version: 4.6.5
@@ -343,12 +350,39 @@ importers:
       '@portfolio/config':
         specifier: workspace:*
         version: link:../config
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
         specifier: 5.0.3
         version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.1))
+
+  packages/ai:
+    dependencies:
+      '@anthropic-ai/sdk':
+        specifier: 1.3.0
+        version: 1.3.0(zod@4.6.5)
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@portfolio/config':
+        specifier: workspace:*
+        version: link:../config
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vitest:
+        specifier: 5.0.3
+        version: 5.0.3(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(jiti@2.7.0)(yaml@2.9.1))
+
+  packages/config: {}
 
   packages/db:
     dependencies:
@@ -388,14 +422,14 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
-  packages/security-news:
+  packages/security-brief:
     dependencies:
-      '@anthropic-ai/sdk':
-        specifier: 1.3.0
-        version: 1.3.0(zod@4.6.5)
-      '@portfolio/contracts':
+      '@portfolio/ai':
         specifier: workspace:*
-        version: link:../contracts
+        version: link:../ai
+      '@portfolio/db':
+        specifier: workspace:*
+        version: link:../db
       zod:
         specifier: 4.6.5
         version: 4.6.5

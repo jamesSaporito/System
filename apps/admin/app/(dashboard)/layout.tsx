@@ -1,6 +1,6 @@
 "use client";
 
-import type { MeResponse } from "@portfolio/contracts";
+import type { MeResponse } from "@portfolio/access/api";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef } from "react";
 import { MenuIcon } from "@/components/icons";
