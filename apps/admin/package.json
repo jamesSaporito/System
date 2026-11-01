@@ -11,7 +11,8 @@
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
-    "@portfolio/contracts": "workspace:*",
+    "@portfolio/access": "workspace:*",
+    "@portfolio/security-brief": "workspace:*",
     "@portfolio/ui": "workspace:*",
     "better-auth": "1.7.7",
     "next": "16.4.2",

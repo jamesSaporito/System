@@ -11,25 +11,40 @@ datasource db {
 // Database naming: plural snake_case tables, snake_case columns, lowercase enum values.
 // Prisma has no global naming setting, so every model, multi-word field, and enum is mapped.
 
+/// An admin tab a member can open. Admins (ADMIN_GITHUB_IDS) hold all of them; managing members
+/// is admin-only and isn't a permission.
+enum Permission {
+  DASHBOARD @map("dashboard")
+  SESSIONS  @map("sessions")
+  SECURITY  @map("security")
+
+  @@map("permission")
+}
+
 /// A GitHub account allowed to sign in to the admin, added by an admin by username. Admins
 /// (ADMIN_GITHUB_IDS) don't need a row. Linked to a User through accounts.account_id once they've
 /// signed in.
 model Member {
-  id          String   @id @default(uuid(7))
+  id          String       @id @default(uuid(7))
   /// Numeric GitHub user ID; matches accounts.account_id.
-  githubId    String   @unique @map("github_id")
-  githubLogin String   @map("github_login")
-  addedById   String?  @map("added_by_id")
-  addedBy     User?    @relation(fields: [addedById], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now()) @map("created_at")
+  githubId    String       @unique @map("github_id")
+  githubLogin String       @map("github_login")
+  /// The tabs this member can open; empty until an admin grants some.
+  permissions Permission[] @default([])
+  addedById   String?      @map("added_by_id")
+  addedBy     User?        @relation(fields: [addedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now()) @map("created_at")
 
   @@map("members")
 }
 
-// --- Security news briefs (generated daily; read by the admin).
+// --- Security news brief: feed entries stored as fetched, and the items written from them.
+// A run fetches each source from where it last stopped, stores entries it hasn't seen (one row
+// per entry, so a refetch adds nothing), groups the unprocessed ones by CVE in code, and has the
+// model write only those groups' text. Read by the admin's Vulnerability Report tab.
 
 /// Section an item is listed under, in reading order (Postgres sorts enums by declaration
-/// order, so `orderBy: [{ section }, { position }]` yields the brief's order).
+/// order). Decided in code from the item's entries, not by the model.
 enum SecurityBriefSection {
   ACTIVELY_EXPLOITED @map("actively_exploited")
   CRITICAL_AND_HIGH  @map("critical_and_high")
@@ -38,7 +53,7 @@ enum SecurityBriefSection {
   @@map("security_brief_section")
 }
 
-/// Severity as the brief states it; null on "Worth Knowing" items.
+/// Severity as a GitHub advisory states it; null when no advisory does.
 enum SecuritySeverity {
   CRITICAL @map("critical")
   HIGH     @map("high")
@@ -48,62 +63,133 @@ enum SecuritySeverity {
   @@map("security_severity")
 }
 
-/// One daily security news brief. One row per run date: a rerun the same day updates the row
-/// (upsert on run_on) and replaces its items. `markdown` keeps the whole brief as written.
-model SecurityBrief {
-  id         String              @id @default(uuid(7))
-  /// Calendar day the brief ran (the template's "Date" column).
-  runOn      DateTime            @unique @map("run_on") @db.Date
-  /// Window covered, inclusive (the "Covers" column).
-  coversFrom DateTime            @map("covers_from") @db.Date
-  coversTo   DateTime            @map("covers_to") @db.Date
-  /// "<Product> <CVE-ID>: <why>" or "Nothing critical".
-  mostUrgent String              @map("most_urgent")
-  /// The full brief as Markdown, exactly as generated.
-  markdown   String
-  items      SecurityBriefItem[]
-  createdAt  DateTime            @default(now()) @map("created_at")
-  updatedAt  DateTime            @updatedAt @map("updated_at")
+/// How a run ended; "nothing new" means no entries were waiting.
+enum SecurityBriefRunOutcome {
+  STORED      @map("stored")
+  NOTHING_NEW @map("nothing_new")
+  FAILED      @map("failed")
 
-  @@map("security_briefs")
+  @@map("security_brief_run_outcome")
 }
 
-/// One entry of a brief: a headed item under "Actively Exploited" / "Critical and High", or a
-/// one-liner under "Worth Knowing" (only product, title, advisoryIds and sources filled).
-/// Items are replaced wholesale when a brief is regenerated, so no updated_at.
+/// Where a feed entry came from.
+enum SecurityFeedSource {
+  KEV    @map("kev")
+  GITHUB @map("github")
+  NEWS   @map("news")
+
+  @@map("security_feed_source")
+}
+
+/// One entry a source gave, stored once: fetching it again finds it already here. It waits
+/// with item_id null until a run writes it into an item, even across failed runs.
+model SecurityFeedEntry {
+  id          String             @id @default(uuid(7))
+  source      SecurityFeedSource
+  /// KEV: the CVE id; GitHub: the GHSA id; news: the article's URL.
+  externalId  String             @map("external_id")
+  /// CVE (and GHSA) ids it's about: KEV and GitHub their own, news those it mentions.
+  advisoryIds String[]           @default([]) @map("advisory_ids")
+  /// The date the source gives: KEV date added, advisory or article published.
+  publishedOn DateTime           @map("published_on") @db.Date
+  /// The entry as read (KevEntry, Advisory or NewsItem in packages/security-brief).
+  data        Json
+  /// The item written from it; null while it waits (or if that item was deleted).
+  itemId      String?            @map("item_id")
+  item        SecurityBriefItem? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  fetchedAt   DateTime           @default(now()) @map("fetched_at")
+
+  @@unique([source, externalId])
+  @@index([itemId])
+  @@map("security_feed_entries")
+}
+
+/// One issue, written from one or more entries that share a CVE. Listed on the day it was
+/// first seen, and on the day a later entry updated it (only the latest update day is kept).
 model SecurityBriefItem {
   id                 String               @id @default(uuid(7))
-  briefId            String               @map("brief_id")
-  brief              SecurityBrief        @relation(fields: [briefId], references: [id], onDelete: Cascade)
   section            SecurityBriefSection
-  /// 0-based order within the section; items are listed by urgency.
-  position           Int
-  product            String
-  /// What the flaw lets an attacker do; the whole line for "Worth Knowing" items.
+  /// The affected product or project, as its vendor names it.
+  subject            String
+  /// What the flaw lets an attacker do.
   title              String
-  /// CVE or GHSA ids, e.g. "CVE-2026-12345", "GHSA-xxxx-xxxx-xxxx".
+  /// CVE and GHSA ids from the item's entries, e.g. "CVE-2026-12345", "GHSA-xxxx-xxxx-xxxx".
   advisoryIds        String[]             @default([]) @map("advisory_ids")
   severity           SecuritySeverity?
   cvssScore          Float?               @map("cvss_score")
   /// CVSS version the score is on ("4.0", "3.1"); null when not stated.
   cvssVersion        String?              @map("cvss_version")
-  /// Prose from the Severity line, e.g. "exploited in the wild since 2026-10-20".
+  /// What the entries say about exploitation, in a sentence.
   exploitationStatus String?              @map("exploitation_status")
-  /// Date it entered CISA's KEV catalog, when the brief says so.
+  /// An entry says it's exploited in the wild (KEV entries always are).
+  exploitedInTheWild Boolean              @default(false) @map("exploited_in_the_wild")
+  /// Date it entered CISA's KEV catalog.
   kevAddedOn         DateTime?            @map("kev_added_on") @db.Date
   affected           String?
   fix                String?
+  /// The earliest date its entries give.
   publishedOn        DateTime?            @map("published_on") @db.Date
-  whyItMatters       String?              @map("why_it_matters")
-  /// Carried over from the previous brief with a change; update_note says what.
-  isUpdate           Boolean              @default(false) @map("is_update")
+  /// Who is affected and how exposed they are.
+  impact             String?
+  /// What the latest update added, e.g. "Added to CISA KEV"; null until it's updated.
   updateNote         String?              @map("update_note")
-  /// [{ "label": string, "url": string }, ...]; shape enforced by securitySourceSchema.
+  /// [{ "label": string, "url": string }, ...], one per entry; shape: securitySourceSchema.
   sources            Json
+  firstSeenOn        DateTime             @map("first_seen_on") @db.Date
+  /// The day a later entry last updated it; null if never.
+  updatedOn          DateTime?            @map("updated_on") @db.Date
+  entries            SecurityFeedEntry[]
   createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
 
-  @@unique([briefId, section, position])
+  @@index([firstSeenOn])
+  @@index([updatedOn])
   @@map("security_brief_items")
+}
+
+/// One run, whatever its outcome: what it cost, what it found, and whether today still needs
+/// a run.
+model SecurityBriefRun {
+  id           String                  @id @default(uuid(7))
+  /// Calendar day the run was for.
+  runOn        DateTime                @map("run_on") @db.Date
+  outcome      SecurityBriefRunOutcome
+  /// Why it failed; null otherwise.
+  error        String?
+  /// Tokens used (the Usage type in packages/ai).
+  usage        Json
+  /// Entries fetched that weren't stored before.
+  newEntries   Int                     @default(0) @map("new_entries")
+  newItems     Int                     @default(0) @map("new_items")
+  updatedItems Int                     @default(0) @map("updated_items")
+  /// Sources that couldn't be read: [{ "source": string, "reason": string }, ...].
+  feedFailures Json                    @default("[]") @map("feed_failures")
+  createdAt    DateTime                @default(now()) @map("created_at")
+
+  @@index([runOn])
+  @@map("security_brief_runs")
+}
+
+/// An RSS or Atom feed the brief reads for security news.
+model SecurityNewsFeed {
+  id        String    @id @default(uuid(7))
+  url       String    @unique
+  /// When it was last read successfully; the next run reads from there (null: last 24 hours).
+  fetchedAt DateTime? @map("fetched_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@map("security_news_feeds")
+}
+
+/// Where CISA KEV and GitHub's advisories were last read up to: a single row (id 1).
+model SecurityNewsSettings {
+  id                  Int       @id @default(1)
+  /// When CISA KEV was last read successfully (null: never; the first read takes 24 hours).
+  kevFetchedAt        DateTime? @map("kev_fetched_at")
+  /// When GitHub's advisories were last read successfully.
+  advisoriesFetchedAt DateTime? @map("advisories_fetched_at")
+
+  @@map("security_news_settings")
 }
 
 // --- Better Auth (core). Field names must match what Better Auth expects;

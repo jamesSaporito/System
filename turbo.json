@@ -16,11 +16,11 @@
       "dependsOn": ["db:up"],
       "cache": false
     },
-    // Starts s3mock for native dev (a no-op inside the dev container).
+    // Starts s3 for native dev (a no-op inside the dev container).
     "media:up": {
       "cache": false
     },
-    // Sync apps/portfolio/media/ with its S3 bucket (s3mock unless S3_ENDPOINT is set empty).
+    // Sync apps/portfolio/media/ with its S3 bucket (s3 unless S3_ENDPOINT is set empty).
     "media:push": {
       "dependsOn": ["media:up"],
       "passThroughEnv": ["S3_ENDPOINT", "MEDIA_BUCKET", "AWS_*"],
@@ -47,7 +47,7 @@
       "cache": false
     },
     "dev": {
-      // The backend gets a running, migrated database; the portfolio gets s3mock for photos.
+      // The backend gets a running, migrated database; the portfolio gets s3 for photos.
       "dependsOn": ["^db:generate", "^db:deploy", "media:up"],
       "passThroughEnv": ["PORT"],
       "cache": false,

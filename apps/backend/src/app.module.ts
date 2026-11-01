@@ -1,12 +1,9 @@
 import { Module } from "@nestjs/common";
-import { AuthModule } from "./auth/auth.module";
+import { AccessModule } from "./access/access.module";
 import { EnvModule } from "./env";
-import { HealthController } from "./health/health.controller";
-import { MembersModule } from "./members/members.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { SecurityBriefModule } from "./security-brief/security-brief.module";
 
-@Module({
-  imports: [EnvModule, PrismaModule, AuthModule, MembersModule],
-  controllers: [HealthController],
-})
+/** Composition only: each feature's behaviour lives in its package (packages/access, …). */
+@Module({ imports: [EnvModule, PrismaModule, AccessModule, SecurityBriefModule] })
 export class AppModule {}

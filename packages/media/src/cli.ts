@@ -6,7 +6,7 @@
  *   portfolio-media push   upload new or changed local files
  *   portfolio-media pull   download files missing (or different) locally
  *
- * Run from the app folder (apps/portfolio). Defaults to the local s3mock.
+ * Run from the app folder (apps/portfolio). Defaults to the local S3 (SeaweedFS).
  * Env: S3_ENDPOINT (set it empty to use real AWS), MEDIA_BUCKET (default: the folder's name),
  * plus the usual AWS_PROFILE / AWS_REGION / credentials for AWS.
  */
@@ -53,7 +53,7 @@ const endpoint = process.env.S3_ENDPOINT ?? "http://localhost:9090";
 const s3 = new S3Client({
   region: process.env.AWS_REGION ?? "us-east-1",
   ...(endpoint
-    ? // s3mock ignores credentials but the SDK requires some.
+    ? // the local bucket ignores credentials but the SDK requires some.
       {
         endpoint,
         forcePathStyle: true,

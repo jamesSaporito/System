@@ -4,7 +4,9 @@ import { vi } from "vitest";
 import { z } from "zod";
 import { configureApp } from "../app";
 import { AppModule } from "../app.module";
+import type { FetchLike, ModelApi } from "@portfolio/security-brief";
 import { ENV, type Env } from "../env";
+import { CLOCK, FEED_FETCH, MODEL_API } from "../security-brief/security-brief.module";
 
 export const ADMIN_URL = "http://localhost:3001";
 
@@ -23,6 +25,8 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
     GITHUB_CLIENT_SECRET: "test",
     ADMIN_GITHUB_IDS: ["1000"],
     ADMIN_URL,
+    ANTHROPIC_API_KEY: undefined,
+    SECURITY_NEWS_SCHEDULE: false,
     ...overrides,
   };
 }
@@ -35,11 +39,25 @@ export type TestApp = {
   signIn: (githubId: number) => Promise<{ cookie: string } | { error: string }>;
 };
 
-export async function createTestApp(env: Env): Promise<TestApp> {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+export type TestAppOptions = {
+  /** Stands in for the Anthropic API when writing the security brief. */
+  model?: ModelApi;
+  /** The time the app sees; the security brief is written for its date. */
+  now?: () => Date;
+  /** Serves the feeds method's requests; by default every request fails, so no test goes online. */
+  feedFetch?: FetchLike;
+};
+
+const offline: FetchLike = (url) => Promise.reject(new Error(`No network in tests: ${url}`));
+
+export async function createTestApp(env: Env, options: TestAppOptions = {}): Promise<TestApp> {
+  let builder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(ENV)
-    .useValue(env)
-    .compile();
+    .useValue(env);
+  if (options.model) builder = builder.overrideProvider(MODEL_API).useValue(options.model);
+  if (options.now) builder = builder.overrideProvider(CLOCK).useValue(options.now);
+  builder = builder.overrideProvider(FEED_FETCH).useValue(options.feedFetch ?? offline);
+  const moduleRef = await builder.compile();
   const app = configureApp(
     moduleRef.createNestApplication<NestExpressApplication>({ bodyParser: false, logger: false }),
   );

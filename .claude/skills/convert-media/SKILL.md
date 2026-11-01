@@ -40,4 +40,4 @@ Never modify or delete anything in `media-originals/`. Only overwrite an existin
 
 ## 4. Report
 
-List each converted file with its new size (`ls -lh`), and any failures or skipped files. Remind the user that `pnpm media:push` (from `apps/portfolio`) uploads the new copies to the local bucket (inside the dev container add `-e S3_ENDPOINT=http://s3mock:9090`, since its default `localhost:9090` only works from the Mac), and `pnpm media:push:prod` with `AWS_PROFILE` set uploads to production. Don't run either unless asked.
+List each converted file with its new size (`ls -lh`), and any failures or skipped files. Remind the user that `pnpm media:push` (from `apps/portfolio`) uploads the new copies to the local bucket (inside the dev container add `-e S3_ENDPOINT=http://s3:9090`, since its default `localhost:9090` only works from the Mac), and `pnpm media:push:prod` with `AWS_PROFILE` set uploads to production. Don't run either unless asked.

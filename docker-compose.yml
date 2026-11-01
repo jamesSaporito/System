@@ -14,9 +14,11 @@ x-dev: &dev
     - admin_node_modules:/app/apps/admin/node_modules
     - admin_next:/app/apps/admin/.next
     - backend_node_modules:/app/apps/backend/node_modules
+    - security_brief_node_modules:/app/packages/security-brief/node_modules
+    - access_node_modules:/app/packages/access/node_modules
+    - ai_node_modules:/app/packages/ai/node_modules
     - ui_node_modules:/app/packages/ui/node_modules
     - config_node_modules:/app/packages/config/node_modules
-    - contracts_node_modules:/app/packages/contracts/node_modules
     - db_node_modules:/app/packages/db/node_modules
     - media_node_modules:/app/packages/media/node_modules
     - pnpm_store:/home/node/.local/share/pnpm
@@ -37,7 +39,7 @@ services:
     depends_on:
       install:
         condition: service_completed_successfully
-      s3mock:
+      s3:
         condition: service_started
 
   admin:
@@ -65,7 +67,7 @@ services:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
-      s3mock:
+      s3:
         condition: service_started
 
   postgres:
@@ -85,19 +87,15 @@ services:
       retries: 15
 
   # S3 stand-in for the portfolio bucket, photos under media/ (see packages/media).
-  # Root so it can write to the named volume.
-  s3mock:
-    image: adobe/s3mock:5.2.3
-    user: "0:0"
+  s3:
+    image: chrislusf/seaweedfs:4.51
+    # `weed mini` runs the whole SeaweedFS stack in one process; with no credentials configured, S3 access is open.
+    command: ["mini", "-dir=/data", "-bucket=portfolio", "-s3.port=9090", "-master.telemetry=false"]
     ports:
       - "9090:9090"
-    environment:
-      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: portfolio
-      COM_ADOBE_TESTING_S3MOCK_STORE_ROOT: /data
-      COM_ADOBE_TESTING_S3MOCK_STORE_RETAIN_FILES_ON_EXIT: "true"
     volumes:
-      - s3mock_data:/data
-    # Ready once the server answers (it takes a few seconds to boot), so `up --wait` really waits.
+      - s3_data:/data
+    # Ready once the bucket exists (it's created a few seconds after boot), so `up --wait` really waits.
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:9090/portfolio"]
       interval: 2s
@@ -113,7 +111,7 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - s3mock
+      - s3
 
 volumes:
   node_modules:
@@ -122,11 +120,13 @@ volumes:
   admin_node_modules:
   admin_next:
   backend_node_modules:
+  security_brief_node_modules:
+  access_node_modules:
+  ai_node_modules:
   ui_node_modules:
   config_node_modules:
-  contracts_node_modules:
   db_node_modules:
   media_node_modules:
   pnpm_store:
   pg_data:
-  s3mock_data:
+  s3_data:
