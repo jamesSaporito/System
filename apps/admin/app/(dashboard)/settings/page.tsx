@@ -16,8 +16,8 @@ export default function SettingsPage() {
   }, [first, router]);
 
   return first ? (
-    <p className="text-neutral-500">Loading…</p>
+    <p className="text-muted">Loading…</p>
   ) : (
-    <p className="text-neutral-500">There are no settings you can change.</p>
+    <p className="text-muted">There are no settings you can change.</p>
   );
 }

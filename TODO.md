@@ -2,7 +2,10 @@
 
 ## Before pushing
 
+- Check the admin redesign in a browser (it hasn't been looked at yet): sidebar hover, active and collapse (remembered after reload), the Settings slide-in and its Back button (also on phones and collapsed), the phone menu, keyboard focus, and the Vulnerability Report detail grid
+
 ## Later
+
 - Write the `/time/` overview intro (`apps/portfolio/app/time/page.draft.tsx`), then publish it: rename to `page.tsx` and drop `draft: true` from Overview in `lib/nav.ts`
 - Make the Leather page (`apps/portfolio/app/leather/page.draft.tsx`) look presentable and nice: none of the photos are landscape, and the hero doesn't work with a portrait photo. Then publish it: rename to `page.tsx` and drop `draft: true` from Leather in `lib/nav.ts`
 - Daily security news on the private admin page (from a claude-configuration session; the `security-news` skill stays there too)
@@ -12,6 +15,7 @@
   - Live runs work: about $1.66 a run with prompt caching (was about $5.93 without). Still to do: compare a brief with what the skill writes for the same day
   - Replace the pasted `SKILL.md` text in `packages/security-news/src/prompt.ts` with the real file if they differ (the layout is in `src/template.ts`)
   - Deploying the backend: it needs internet egress (GitHub OAuth, the GitHub user lookup and the Anthropic API; the planned VPC has none today), `ANTHROPIC_API_KEY` as a secret, `SECURITY_NEWS_SCHEDULE=true`, and a single instance (or a database lock before running more)
-  - The admin's Vulnerability Report tab shows the briefs by date, and admins edit its sources at `/vulnerability-report/sources/`. Still to add: a "Run now" button for admins (`POST /security-briefs/run`), and iterate on the layout
+  - The admin's Vulnerability Report tab shows the briefs by date, and admins edit its sources at `/vulnerability-report/sources/`. Still to add: a "Run now" button for admins (`POST /security-briefs/run`)
   - Not yet run against the real API since the sources, "nothing new" and the subject/impact renames: do a live run (asks first, about $1.66), ideally once with the toggle off
   - The admin page is meant as a personal display of things I want to see
+- Admin dashboard is empty. Ideas: today's security snapshot (latest brief's most urgent line and counts), brief run health and API spend (`security_brief_runs`), a stack watchlist matched against brief subjects, Dependabot alerts (needs a GitHub token in the backend), deploy/site status, quick links

@@ -2,3 +2,31 @@
 
 /* Workspace packages live behind node_modules symlinks, which Tailwind doesn't scan. */
 @source "../../../packages/ui/src";
+
+/*
+ * The admin's one theme: dark, blue-slate "ink" with a cyan accent. Every text colour here is at
+ * least WCAG AA (4.5:1) on canvas, surface and raised. Use these instead of Tailwind's neutrals.
+ */
+@theme {
+  --color-canvas: #10131a; /* page background */
+  --color-surface: #171b24; /* sidebar, cards */
+  --color-raised: #1f2430; /* hover, inputs */
+  --color-line: #262c38; /* borders, grid lines */
+  --color-line-strong: #353d4d; /* borders on hover */
+  --color-fg: #e6e9ef; /* text */
+  --color-muted: #8b93a5; /* secondary text */
+  --color-accent: #5ee1e6; /* active tab, links, primary buttons, focus */
+  --color-urgent: #ff5d73; /* most urgent, errors, destructive actions */
+  --color-ok: #5fd38d; /* success */
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+}

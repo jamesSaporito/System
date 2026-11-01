@@ -50,21 +50,29 @@ function SignIn() {
     (errorCode ? (ERROR_MESSAGES[errorCode] ?? `Sign-in failed (${errorCode}).`) : null);
 
   return (
-    <main className="mx-auto mt-24 max-w-sm text-center">
-      <h1 className="text-2xl font-bold">Admin</h1>
-      {message ? (
-        <p role="alert" className="mt-4 text-sm text-red-600 dark:text-red-400">
-          {message}
-        </p>
-      ) : null}
-      <button
-        type="button"
-        onClick={() => void signIn()}
-        disabled={pending}
-        className="mt-6 w-full rounded-md bg-neutral-900 px-4 py-2 font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
-      >
-        {pending ? "Redirecting…" : "Sign in with GitHub"}
-      </button>
+    <main className="mx-auto mt-24 max-w-sm px-4">
+      <div className="rounded-xl border border-line bg-surface p-8 text-center shadow-2xl shadow-black/30">
+        <span
+          aria-hidden
+          className="mx-auto grid size-10 place-items-center rounded-lg bg-accent/15 font-mono font-bold text-accent"
+        >
+          A
+        </span>
+        <h1 className="mt-4 text-2xl font-bold">Admin</h1>
+        {message ? (
+          <p role="alert" className="mt-4 text-sm text-urgent">
+            {message}
+          </p>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => void signIn()}
+          disabled={pending}
+          className="mt-6 w-full rounded-lg bg-accent px-4 py-2 font-medium text-canvas transition hover:brightness-110 disabled:opacity-50"
+        >
+          {pending ? "Redirecting…" : "Sign in with GitHub"}
+        </button>
+      </div>
     </main>
   );
 }

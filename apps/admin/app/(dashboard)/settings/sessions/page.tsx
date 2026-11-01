@@ -31,10 +31,10 @@ function Sessions() {
   return (
     <>
       <h1 className="text-3xl font-bold">Sessions</h1>
-      <p className="mt-2 text-sm text-neutral-500">Browsers where you&apos;re signed in.</p>
-      {state.status === "loading" ? <p className="mt-6 text-neutral-500">Loading…</p> : null}
+      <p className="mt-2 text-sm text-muted">Browsers where you&apos;re signed in.</p>
+      {state.status === "loading" ? <p className="mt-6 text-muted">Loading…</p> : null}
       {state.status === "error" ? (
-        <p role="alert" className="mt-6 text-red-600 dark:text-red-400">
+        <p role="alert" className="mt-6 text-urgent">
           {state.message}
         </p>
       ) : null}
@@ -43,19 +43,19 @@ function Sessions() {
           {state.data.map((session) => (
             <li
               key={session.id}
-              className="flex items-center gap-3 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800"
+              className="flex items-center gap-3 rounded-lg border border-line bg-surface p-3"
             >
-              <span className="truncate text-neutral-600 dark:text-neutral-400">
+              <span className="truncate text-muted">
                 {session.userAgent ?? "Unknown device"} · {session.ipAddress ?? "unknown IP"} ·
                 signed in {new Date(session.createdAt).toLocaleString()}
               </span>
               {session.id === current?.session.id ? (
-                <span className="ml-auto shrink-0 text-xs text-neutral-500">this browser</span>
+                <span className="ml-auto shrink-0 text-xs text-muted">this browser</span>
               ) : (
                 <button
                   type="button"
                   onClick={() => void revoke(session.token)}
-                  className="ml-auto shrink-0 underline"
+                  className="ml-auto shrink-0 rounded-md px-2 py-1 text-urgent transition-colors hover:bg-urgent/10"
                 >
                   Revoke
                 </button>

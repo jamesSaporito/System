@@ -63,13 +63,11 @@ function Members() {
   return (
     <>
       <h1 className="text-3xl font-bold">Members</h1>
-      <p className="mt-2 text-sm text-neutral-500">
-        People who can sign in to this admin with GitHub.
-      </p>
+      <p className="mt-2 text-sm text-muted">People who can sign in to this admin with GitHub.</p>
       {notice ? (
         <p
           role={notice.kind === "error" ? "alert" : "status"}
-          className={`mt-4 text-sm ${notice.kind === "error" ? "text-red-600 dark:text-red-400" : "text-green-700 dark:text-green-400"}`}
+          className={`mt-4 text-sm ${notice.kind === "error" ? "text-urgent" : "text-ok"}`}
         >
           {notice.text}
         </p>
@@ -87,21 +85,21 @@ function Members() {
         }
       />
 
-      {state.status === "loading" ? <p className="mt-6 text-neutral-500">Loading…</p> : null}
+      {state.status === "loading" ? <p className="mt-6 text-muted">Loading…</p> : null}
       {state.status === "error" ? (
-        <p role="alert" className="mt-6 text-red-600 dark:text-red-400">
+        <p role="alert" className="mt-6 text-urgent">
           {state.message}
         </p>
       ) : null}
       {state.status === "ready" ? (
         state.data.members.length === 0 ? (
-          <p className="mt-6 text-neutral-500">No members yet.</p>
+          <p className="mt-6 text-muted">No members yet.</p>
         ) : (
           <ul className="mt-6 grid gap-2">
             {state.data.members.map((member) => (
               <li
                 key={member.id}
-                className="flex flex-wrap items-center gap-3 rounded-lg border border-neutral-200 p-3 dark:border-neutral-800"
+                className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-surface p-3"
               >
                 {member.user?.image ? (
                   <Image
@@ -113,7 +111,7 @@ function Members() {
                   />
                 ) : null}
                 <span className="font-medium">{member.user?.name ?? member.githubLogin}</span>
-                <span className="text-sm text-neutral-500">
+                <span className="text-sm text-muted">
                   @{member.githubLogin}
                   {member.user ? null : " · hasn't signed in yet"}
                 </span>
@@ -135,7 +133,7 @@ function Members() {
                       return;
                     void mutate(() => api(`/members/${member.id}`, { method: "DELETE" }));
                   }}
-                  className="ml-auto text-sm text-red-600 underline dark:text-red-400"
+                  className="ml-auto rounded-md px-2 py-1 text-sm text-urgent transition-colors hover:bg-urgent/10"
                 >
                   Remove
                 </button>
@@ -167,24 +165,21 @@ function PermissionsEditor({
             const name = PERMISSION_PRESET_NAMES.find((n) => n === event.target.value);
             if (name) onChange([...PERMISSION_PRESETS[name]]);
           }}
-          className="rounded-md border border-neutral-300 bg-transparent px-2 py-1 dark:border-neutral-700"
+          className="rounded-md border border-line bg-raised px-2.5 py-1.5 transition-colors hover:border-line-strong"
         >
           {PERMISSION_PRESET_NAMES.map((name) => (
-            <option key={name} value={name} className="text-neutral-900">
+            <option key={name} value={name}>
               {PRESET_LABELS[name]}
             </option>
           ))}
-          {preset === "custom" ? (
-            <option value="custom" className="text-neutral-900">
-              Custom
-            </option>
-          ) : null}
+          {preset === "custom" ? <option value="custom">Custom</option> : null}
         </select>
       </label>
       {PERMISSIONS.map((permission) => (
         <label key={permission} className="flex items-center gap-1.5">
           <input
             type="checkbox"
+            className="accent-accent"
             checked={permissions.includes(permission)}
             onChange={(event) =>
               onChange(
@@ -221,13 +216,13 @@ function AddForm({ onAdd }: { onAdd: (githubLogin: string) => Promise<void> }) {
           required
           value={githubLogin}
           onChange={(event) => setGithubLogin(event.target.value)}
-          className="rounded-md border border-neutral-300 bg-transparent px-2 py-1 dark:border-neutral-700"
+          className="rounded-md border border-line bg-raised px-2.5 py-1.5 transition-colors hover:border-line-strong"
         />
       </label>
       <button
         type="submit"
         disabled={pending}
-        className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-white dark:text-neutral-900"
+        className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-canvas transition hover:brightness-110 disabled:opacity-50"
       >
         {pending ? "Adding…" : "Add"}
       </button>
